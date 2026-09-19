@@ -1,6 +1,8 @@
 # Tracker
 
-Webcam in, OSC out. The game (Unreal) listens on UDP **7000**. The tracker listens on **7001**.
+Webcam in, OSC out. The game (Unreal) listens on UDP **7000**. The tracker listens on **7001**. The small camera picture the game shows in its corner goes to **7002** as JPEG slices ([preview.py](preview.py), `--no-preview` turns it off).
+
+With the game: `../play.sh` from the repo root starts both. By hand: `.venv/bin/python run.py --no-window` (the venv, not conda's python).
 The message contract is in [PLAN.md](../PLAN.md) section 4 and in [protocol.py](protocol.py).
 
 ## Setup (once)

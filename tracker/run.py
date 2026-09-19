@@ -22,6 +22,7 @@ from glove import FIRE, RELOAD, Glove
 from landmarks import Landmarker, frame_from_json, frame_to_json
 from osc_io import OscIn, OscOut
 from pipeline import Pipeline
+from preview import PreviewSender
 
 CALIB_CORNERS = [(0.15, 0.2), (0.85, 0.2), (0.85, 0.8), (0.15, 0.8)]
 WINDOW = "finger gun tracker"
@@ -123,6 +124,7 @@ class Tracker(threading.Thread):
         self.out = OscOut(args.host, args.port)
         self.osc_in = OscIn(args.in_port)
         self.glove = None if (args.arduino == "off" or args.replay) else Glove(args.arduino)
+        self.preview = None if (args.no_preview or args.replay) else PreviewSender(args.host)
         self.calib = LocalCalibration()
         self.keys = queue.SimpleQueue()
         self.stop_flag = threading.Event()
@@ -237,6 +239,9 @@ class Tracker(threading.Thread):
                         if glove:
                             glove.send(RELOAD)
                     self.counts[e[0]] += 1
+                if self.preview:
+                    gun = pipeline.debug.get("gun")
+                    self.preview.send(bgr, frame, gun.hand if gun else None, any(e[0] == "fire" for e in events))
                 if self.recorder:
                     self.recorder.write(frame_to_json(frame) + "\n")
 
@@ -287,6 +292,7 @@ def main():
     ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
     ap.add_argument("--arduino", default="auto", help="glove serial port, e.g. /dev/cu.usbmodem1101 or COM5. auto = find it, off = no glove")
     ap.add_argument("--no-window", action="store_true", help="no tuning window. Use this on the demo machine")
+    ap.add_argument("--no-preview", action="store_true", help="do not send the small camera picture the game shows in its corner")
     ap.add_argument("--windowed", action="store_true", help="tuning window not fullscreen (W toggles)")
     ap.add_argument("--frames", type=int, default=0, help="stop after this many frames (0 = run until Q)")
     ap.add_argument("--record", nargs="?", const="auto", help="write landmarks to a .jsonl file")
