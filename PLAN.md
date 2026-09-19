@@ -91,7 +91,7 @@ Game to tracker, port 7001 (optional, tracker has sane defaults without it):
 `/fg/calib/begin` start calibration, reset stance baseline.
 `/fg/calib/target` `[sx, sy]` the player is about to shoot a target at this screen position. Tracker pairs it with the next fire. During calibration the game counts *any* `/fg/fire` as a hit on the current bottle.
 **Hide the crosshair during calibration.** The player should point at the bottle naturally, not steer a cursor onto it. The crosshair appears after the last bottle, already lined up with how they point.
-`/fg/recenter` current position becomes neutral lean and standing height.
+`/fg/recenter` current position becomes neutral lean and standing height, **and wherever the player is pointing becomes the middle of the screen**. Send it when you know they are pointing at the centre (for example the moment they shoot a START sign placed mid-screen). The tracker also does this by itself each time a hand comes up, and the bottle calibration refines it.
 
 Mouse mode mapping (Unreal side and `fake_tracker.py`): mouse = aim, LMB = fire, R = reload, A/D = lean, S = duck, H = holster, F = Focus.
 
@@ -105,7 +105,7 @@ Found on the way: `mediapipe 1.0.1` is unusable on macOS (CPU path aborts at loa
 
 1. **Hour 1, unblocks everyone:** push `fake_tracker.py` (mouse and keys in an OpenCV window, sends the exact OSC above) and `osc_monitor.py` (prints whatever arrives on 7000). Jason builds against the fake.
 2. **Landmarks.** Webcam 1280x720, HandLandmarker (2 hands) + PoseLandmarker lite, debug window with skeleton and FPS. Test standing 4-5 ft back. Target 25+ FPS.
-3. **Aim.** Hand position relative to the chest in real metres (each scaled by its own depth: the hand by its apparent size, the chest by shoulder width), so leaning does not drag the crosshair and it works seated close or standing far. Use the knuckle more than the fingertip: a finger pointed straight at the camera is the worst case for hand tracking. One Euro filter. Default mapping works with no calibration. Send `/fg/state`.
+3. **Aim.** Fingertip position relative to the chest in real metres (each scaled by its own depth), times the gain an eye-to-fingertip ray would have, around a centre learned from where the player first points. Leaning does not drag it, it works seated close or standing far, and it cannot get stuck off screen. Use the knuckle more than the fingertip: a finger pointed straight at the camera is the worst case for hand tracking. One Euro filter. Default mapping works with no calibration. Send `/fg/state`.
 4. **Trigger.** Thumb drop (thumb-tip distance normalized by palm size, hysteresis + velocity threshold) and recoil flick (upward velocity spike from rest). Shared 250ms cooldown. Aim history ring buffer, rewind to gesture onset. Send `/fg/fire`. Pass mark: 18 of 20 deliberate shots register, zero fire while just aiming.
 5. **Reload slap.** A slap looks like a recoil kick, so: a kick from either hand while the hands are together is a reload, a kick with them apart is a shot. A fast approach seen by the hand model also counts. Send `/fg/reload`.
 6. **Body.** Lean from chest X, duck from chest Y against an auto-captured standing baseline, holster from wrist vs hip line, open-palm detect on the off hand.

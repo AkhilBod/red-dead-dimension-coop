@@ -30,16 +30,25 @@ class Config:
     hand_dedupe: float = 0.5            # two detections closer than this many hand lengths are one hand
 
     # --- Aim -----------------------------------------------------------------
-    # Aim = where the hand is relative to the chest, in real metres. Position, not the
-    # finger's direction: a finger pointed at the camera is foreshortened to nothing.
-    aim_tip_weight: float = 0.2         # 0 = index knuckle only, 1 = fingertip only
-    aim_span_x: float = 0.32            # m of hand travel that crosses the full screen width
-    aim_center_x: float = 0.15          # [rec] m out from mid-chest on the gun side
-    aim_center_y: float = -0.13         # [rec] m, negative = above the shoulder line
-    aim_span_min: float = 0.18          # calibration may not make the gain twitchier than this
-    aim_span_max: float = 0.70
-    aim_min_cutoff: float = 1.0         # One Euro: lower = steadier at rest. [rec] leaves ~0.4% x, 0.7% y of screen jitter
-    aim_beta: float = 6.0               # One Euro: higher = less lag in fast moves (speeds here are m/s)
+    # [rec] Every direction-based model was tried on recorded sessions and failed: a ray along
+    # the finger, wrist-to-tip and elbow-to-tip all landed tens of cm off screen and jittered
+    # 1-4 cm, because a finger pointed at the camera is foreshortened to nothing. Fingertip
+    # POSITION is steady to ~2 mm, so aim is position, with the gain real geometry would give:
+    # a ray from the eyes through the fingertip moves (eye distance / arm reach) times as far on
+    # the screen as the fingertip moves. About 16 cm of fingertip travel per laptop screen width.
+    camera_hfov_deg: float = 60.0       # horizontal field of view of the webcam
+    screen_width_m: float = 0.30        # physical width of the game screen. ~1.2 for a 55 inch TV
+    finger_reach_m: float = 0.06        # the fingertip is this much nearer the camera than the palm
+    aim_lever_min: float = 1.2
+    aim_lever_max: float = 4.0
+    aim_gain: float = 0.75              # x the geometric gain. 1.0 = crosshair travels as far as an eye-fingertip ray. [ and ] keys
+    aim_settle_s: float = 0.25          # the median fingertip position over this long after the hand comes up = screen centre
+    aim_recenter_after_s: float = 2.0   # gun hand gone this long: learn the centre again when it comes back
+    aim_push_max_speed: float = 1.2     # m/s. Faster than this is a tracking jump, not a hand pushing past the screen edge
+    calib_gain_min: float = 0.4         # calibration may scale the geometric gain by this much, no more
+    calib_gain_max: float = 2.5
+    aim_min_cutoff: float = 1.0         # One Euro: lower = steadier at rest
+    aim_beta: float = 3.0               # One Euro: higher = less lag in fast moves (speeds here are m/s on the screen plane)
     aim_hold_s: float = 0.25            # keep the crosshair alive through short dropouts
     hand_scale_window_s: float = 0.7    # median window for the hand's image scale
     gun_lock_jump: float = 1.5          # hand lengths the gun hand may jump between frames and stay "the gun"
@@ -80,7 +89,8 @@ class Config:
     # --- Firing --------------------------------------------------------------
     fire_cooldown_s: float = 0.25
     other_trigger_lockout_s: float = 0.45   # thumb drop then recoil kick is ONE shot, not two
-    rewind_margin_s: float = 0.03       # step a little further back than the detected onset
+    rewind_margin_s: float = 0.04       # a gesture is only detectable once under way: skip back past its first frames...
+    rewind_window_s: float = 0.15       # ...and take the median aim over this stretch, where the hand was still held on target
     rewind_max_s: float = 0.6
     trigger_gap_reset_s: float = 0.25
 

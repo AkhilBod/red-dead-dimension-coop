@@ -22,6 +22,7 @@ from osc_io import OscIn, OscOut
 from pipeline import Pipeline
 
 CALIB_CORNERS = [(0.15, 0.2), (0.85, 0.2), (0.85, 0.8), (0.15, 0.8)]
+WINDOW = "finger gun tracker"
 
 
 class Camera:
@@ -141,6 +142,7 @@ def main():
     ap.add_argument("--pose-every", type=int, default=1, help="run the body model every Nth frame (2 saves CPU)")
     ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
     ap.add_argument("--no-window", action="store_true")
+    ap.add_argument("--windowed", action="store_true", help="tuning window not fullscreen (W toggles)")
     ap.add_argument("--frames", type=int, default=0, help="stop after this many frames (0 = run until Q)")
     ap.add_argument("--record", nargs="?", const="auto", help="write landmarks to a .jsonl file")
     ap.add_argument("--replay", help="run the pipeline over a recorded .jsonl instead of the camera")
@@ -154,6 +156,13 @@ def main():
     out = OscOut(args.host, args.port)
     osc_in = OscIn(args.in_port)
     view = None if args.no_window else DebugView()
+    fullscreen = not args.windowed
+    if view:
+        # Fullscreen by default: the crosshair is mapped to the whole screen, like the game's will be.
+        # In a small window it would travel less than your finger points and feel wrong.
+        cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+        if fullscreen:
+            cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     calib = LocalCalibration()
     print(f"[tracker] sending to {args.host}:{args.port}, listening on {args.in_port}")
 
@@ -203,7 +212,7 @@ def main():
             ms = (now - frame.t) * 1000 if not args.replay else (now - work_start) * 1000
 
             if view:
-                cv2.imshow("finger gun tracker", view.draw(bgr, frame, pipeline, state, events, fps, ms, recorder is not None))
+                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, events, fps, ms, recorder is not None))
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
                     break
@@ -211,6 +220,14 @@ def main():
                     calib.start(pipeline)
                 elif key == ord("n"):
                     pipeline.body.recenter()
+                elif key == ord("x"):
+                    pipeline.recenter_aim = True
+                elif key in (ord("["), ord("]")):
+                    cfg.aim_gain = round(max(0.2, min(3.0, cfg.aim_gain * (1.15 if key == ord("]") else 1 / 1.15))), 3)
+                    print(f"[tracker] aim_gain = {cfg.aim_gain}   (keep it with: --set aim_gain={cfg.aim_gain})")
+                elif key == ord("w"):
+                    fullscreen = not fullscreen
+                    cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN if fullscreen else cv2.WINDOW_NORMAL)
                 elif key == ord("f"):
                     cfg.flick_enabled = not cfg.flick_enabled
                     print(f"[tracker] flick trigger {'on' if cfg.flick_enabled else 'off'}")

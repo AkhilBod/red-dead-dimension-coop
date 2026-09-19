@@ -28,27 +28,42 @@ class OneEuroTests(unittest.TestCase):
 
 
 class AimMapperTests(unittest.TestCase):
-    def test_default_center_depends_on_gun_side(self):
+    def test_uncentred_maps_to_the_middle(self):
+        m = AimMapper(Config())
+        self.assertEqual(m.map(np.array([0.3, -0.2]), 2.0), (0.5, 0.5))
+
+    def test_centre_gain_and_lever(self):
         cfg = Config()
         m = AimMapper(cfg)
-        self.assertEqual(m.map(np.array([cfg.aim_center_x, cfg.aim_center_y]), 1), (0.5, 0.5))
-        self.assertEqual(m.map(np.array([-cfg.aim_center_x, cfg.aim_center_y]), -1), (0.5, 0.5))
+        m.center_on(np.array([0.2, -0.1]))
+        self.assertEqual(m.map(np.array([0.2, -0.1]), 2.0), (0.5, 0.5))
+        x, _ = m.map(np.array([0.2 + 0.03, -0.1]), 2.0)
+        self.assertAlmostEqual(x, 0.5 + 0.03 * 2.0 / cfg.screen_width_m)
+
+    def test_edge_push_drags_the_centre(self):
+        m = AimMapper(Config())
+        m.center_on(np.array([0.0, 0.0]))
+        self.assertEqual(m.map(np.array([1.0, 0.0]), 2.0)[0], 1.0)           # far past the right edge
+        self.assertLess(m.map(np.array([0.98, 0.0]), 2.0)[0], 0.9)           # 2 cm back is already well on screen
+        m.center_on(np.array([0.0, 0.0]))
+        m.map(np.array([1.0, 0.0]), 2.0, push=False)
+        self.assertEqual(m.map(np.array([0.98, 0.0]), 2.0)[0], 1.0)          # without the push it would still be lost
 
     def test_calibration_gain_is_clamped(self):
         cfg = Config()
         m = AimMapper(cfg)
         m.begin()
         # Player barely moved their hand between the left and right targets.
-        for raw, target in (((0.50, -0.2), (0.15, 0.5)), ((0.55, -0.2), (0.85, 0.5)), ((0.52, -0.3), (0.5, 0.2))):
+        for raw, target in (((0.500, -0.2), (0.15, 0.5)), ((0.505, -0.2), (0.85, 0.5)), ((0.502, -0.3), (0.5, 0.2))):
             m.set_target(*target)
-            self.assertTrue(m.add_shot(np.array(raw)))
-        self.assertAlmostEqual(m.gain[0], 1.0 / cfg.aim_span_min)
+            self.assertTrue(m.add_shot(np.array(raw), 2.0))
+        self.assertAlmostEqual(m.k[0], cfg.calib_gain_max)
 
     def test_shots_without_a_pending_target_are_ignored(self):
         m = AimMapper(Config())
-        self.assertFalse(m.add_shot(np.array([0.0, 0.0])))
+        self.assertFalse(m.add_shot(np.array([0.0, 0.0]), 2.0))
         m.begin()
-        self.assertFalse(m.add_shot(np.array([0.0, 0.0])))
+        self.assertFalse(m.add_shot(np.array([0.0, 0.0]), 2.0))
         self.assertFalse(m.calibrated)
 
 

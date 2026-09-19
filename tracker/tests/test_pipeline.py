@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import synth
-from synth import ASPECT, SHOULDER_Y, SW, Sim, make_hand, make_pose, rest_wrist
+from synth import ASPECT, SHOULDER_Y, SW, ZOOM, Sim, make_hand, make_pose, rest_wrist
 
 import protocol as P
 from config import Config
@@ -134,13 +134,14 @@ class PipelineTests(unittest.TestCase):
         sim = Sim()
         before = sim.run(0.8, lambda k: aiming(rest_wrist()))
         shift = 0.9 * SW
-        sim.run(0.4, lambda k: aiming(rest_wrist(CX + shift * k), center_x=CX + shift * k))
-        after = sim.run(0.6, lambda k: aiming(rest_wrist(CX + shift), center_x=CX + shift))
+        hand = lambda body_shift: rest_wrist() + np.array([body_shift * ZOOM, 0.0])     # the nearer hand moves further in the image
+        sim.run(0.4, lambda k: aiming(hand(shift * k), center_x=CX + shift * k))
+        after = sim.run(0.6, lambda k: aiming(hand(shift), center_x=CX + shift))
         self.assertGreater(after.lean, 0.9)
         self.assertAlmostEqual(after.aim_x, before.aim_x, delta=0.03)
         self.assertAlmostEqual(after.aim_y, before.aim_y, delta=0.03)
         self.assertEqual(sim.count("fire"), 0)
-        left = sim.run(1.0, lambda k: aiming(rest_wrist(CX - shift), center_x=CX - shift))
+        left = sim.run(1.0, lambda k: aiming(hand(-shift), center_x=CX - shift))
         self.assertLess(left.lean, -0.9)
 
     def test_neutral_stance_is_learned_wherever_the_player_stands(self):
@@ -219,7 +220,7 @@ class PipelineTests(unittest.TestCase):
     def test_calibration_maps_pointing_positions_to_targets(self):
         sim = Sim()
         base = rest_wrist()
-        corners = [((0.15, 0.2), (-0.5, -0.3)), ((0.85, 0.2), (0.5, -0.3)), ((0.85, 0.8), (0.5, 0.3)), ((0.15, 0.8), (-0.5, 0.3))]
+        corners = [((0.15, 0.2), (-0.3, -0.18)), ((0.85, 0.2), (0.3, -0.18)), ((0.85, 0.8), (0.3, 0.18)), ((0.15, 0.8), (-0.3, 0.18))]
         sim.pipeline.handle_command(P.ADDR_CALIB_BEGIN, ())
         for target, offset in corners:
             sim.pipeline.handle_command(P.ADDR_CALIB_TARGET, target)
@@ -234,6 +235,37 @@ class PipelineTests(unittest.TestCase):
             state = sim.run(0.8, lambda k: aiming(wrist))
             self.assertAlmostEqual(state.aim_x, target[0], delta=0.04)
             self.assertAlmostEqual(state.aim_y, target[1], delta=0.04)
+
+    def test_crosshair_starts_in_the_middle_wherever_the_hand_comes_up(self):
+        for offset in ((0.0, 0.0), (0.9, 0.5), (-0.6, -0.4)):
+            sim = Sim()
+            wrist = rest_wrist() + np.array(offset) * SW
+            state = sim.run(0.8, lambda k: aiming(wrist))
+            self.assertAlmostEqual(state.aim_x, 0.5, delta=0.02)
+            self.assertAlmostEqual(state.aim_y, 0.5, delta=0.02)
+
+    def test_pushing_past_the_edge_does_not_lose_the_crosshair(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(0.8, lambda k: aiming(wrist))
+        far = wrist + np.array([3.0, 0.0]) * SW             # way past the right edge of the screen
+        pinned = sim.run(0.6, lambda k: aiming(wrist + (far - wrist) * k))
+        self.assertEqual(pinned.aim_x, 1.0)
+        back = far - np.array([0.15, 0.0]) * SW             # a small move back...
+        state = sim.run(0.6, lambda k: aiming(far + (back - far) * k))
+        self.assertLess(state.aim_x, 0.95)                  # ...comes straight off the edge, like a mouse
+
+    def test_recenter_command_centres_the_crosshair(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(0.8, lambda k: aiming(wrist))
+        moved = wrist + np.array([0.3, 0.2]) * SW
+        state = sim.run(0.6, lambda k: aiming(moved))
+        self.assertGreater(state.aim_x, 0.6)
+        sim.pipeline.handle_command(P.ADDR_RECENTER, ())
+        state = sim.run(0.4, lambda k: aiming(moved))
+        self.assertAlmostEqual(state.aim_x, 0.5, delta=0.02)
+        self.assertAlmostEqual(state.aim_y, 0.5, delta=0.02)
 
     def test_landmark_noise_causes_no_events_and_little_jitter(self):
         sim = Sim(noise=0.001)      # about 1.3 px at 720p, in line with what a recorded session showed
@@ -278,20 +310,22 @@ class RecordedSessionRegressions(unittest.TestCase):
         self.assertIsNone(sim.pipeline.debug["off"])
         self.assertEqual(sim.events, [])
 
-    def test_aim_gain_does_not_depend_on_how_near_the_camera_the_hand_is(self):
-        # Seated at a laptop the hand is ~2.6x nearer the camera than the chest, so it moves
-        # 2.6x further in the image. Ten real centimetres must still be ten centimetres.
-        moved = {}
-        for zoom in (1.0, 2.6):
+    def test_crosshair_travel_follows_real_distance_and_geometry(self):
+        # Seated at a laptop the hand is ~2.6x nearer the camera than the chest, so it moves 2.6x
+        # further in the image. What counts is real fingertip travel, times the eye-to-fingertip
+        # lever for those depths. Here: 5 real centimetres.
+        cfg = Config()
+        focal = 0.5 * ASPECT / np.tan(np.radians(cfg.camera_hfov_deg) / 2)
+        z_chest = focal / synth.M
+        for zoom in (1.8, 2.6):
             sim = Sim()
-            centre = np.array([CX, 0.5])
-            a = centre + (rest_wrist() - centre)             # same image spot to start from
-            b = a + np.array([0.10 * synth.M * zoom, 0.0])   # 10 cm to the right at that depth
+            a = rest_wrist()
+            b = a + np.array([0.05 * synth.M * zoom, 0.0])
             start = sim.run(0.8, lambda k: ([make_hand(a, zoom=zoom)], make_pose(wrists={"R": tuple(a)})))
             end = sim.run(0.8, lambda k: ([make_hand(b, zoom=zoom)], make_pose(wrists={"R": tuple(b)})))
-            moved[zoom] = end.aim_x - start.aim_x
-        self.assertAlmostEqual(moved[1.0], 0.10 / Config().aim_span_x, delta=0.03)
-        self.assertAlmostEqual(moved[2.6], moved[1.0], delta=0.03)
+            lever = z_chest / (z_chest - (focal / (synth.M * zoom) - cfg.finger_reach_m))
+            expected = 0.05 * lever * cfg.aim_gain / cfg.screen_width_m
+            self.assertAlmostEqual(end.aim_x - start.aim_x, expected, delta=0.12 * expected)
 
     def test_gun_lock_does_not_slide_onto_the_slapping_hand(self):
         sim = Sim()

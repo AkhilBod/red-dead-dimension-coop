@@ -19,6 +19,7 @@ ASPECT = 16 / 9
 SW = 0.27                   # shoulder width in image heights (player about 1.5 m away)
 M = SW / 0.37               # image heights per metre (hand and body at the same depth)
 SHOULDER_Y = 0.45
+ZOOM = 1.8                  # the gun hand is held out toward the camera: this much nearer than the body
 
 
 def _lerp(a, b, k):
@@ -47,7 +48,7 @@ def hand_model(thumb=0.0, open_palm=False):
     return p
 
 
-def make_hand(wrist_xy, thumb=0.0, pitch=0.0, open_palm=False, label="Right", zoom=1.0, score=0.95):
+def make_hand(wrist_xy, thumb=0.0, pitch=0.0, open_palm=False, label="Right", zoom=ZOOM, score=0.95):
     """wrist_xy in image heights. pitch in radians, positive tips the finger up.
     zoom = how much nearer the camera the hand is than the body (2.6 = seated at a laptop)."""
     p = hand_model(thumb, open_palm)

@@ -6,7 +6,7 @@ HAND_EDGES = [(0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (5, 6), (6, 7), (7, 8), (5
               (9, 13), (13, 14), (14, 15), (15, 16), (13, 17), (17, 18), (18, 19), (19, 20), (0, 17)]
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 GREEN, ORANGE, RED, GRAY, WHITE, YELLOW = (80, 255, 80), (0, 170, 255), (60, 60, 255), (130, 130, 130), (240, 240, 240), (60, 220, 255)
-KEYS = "Q quit   C calibrate   N recenter   F flick on/off   R record"
+KEYS = "Q quit   X centre crosshair here   [ ] sensitivity   C calibrate   N recenter stance   F recoil trigger on/off   R record   W window"
 
 
 class DebugView:
@@ -95,10 +95,10 @@ class DebugView:
         cv2.line(img, (cx - 26, cy), (cx + 26, cy), color, 1, cv2.LINE_AA)
         cv2.line(img, (cx, cy - 26), (cx, cy + 26), color, 1, cv2.LINE_AA)
 
-        for x0, y0, x1, y1 in ((0, 0, 520, 60), (0, 60, 320, 240), (0, h - 30, w, h)):
+        for x0, y0, x1, y1 in ((0, 0, 640, 60), (0, 60, 320, 240), (0, h - 30, w, h)):
             img[y0:y1, x0:x1] = (img[y0:y1, x0:x1] * 0.35).astype(np.uint8)     # dark backing so text reads over video
         cv2.putText(img, f"{fps:4.1f} fps  {ms:4.1f} ms   gun arm {dbg.get('gun_arm') or '?'}   "
-                         f"{'calibrated' if pipeline.mapper.calibrated else 'default aim map'}"
+                         f"gain {cfg.aim_gain:.2f} x lever {dbg.get('lever', 0):.1f}   {'calibrated' if pipeline.mapper.calibrated else ('centred' if pipeline.mapper.centered else 'centring...')}"
                          f"{'   REC' if recording else ''}", (12, 22), FONT, 0.55, WHITE, 1, cv2.LINE_AA)
         flags = [("TRACK", state.tracking), ("GUN", state.gun_pose), ("AIM", state.aim_valid),
                  ("HOLSTER", state.holstered), ("OPEN", state.off_hand_open)]
@@ -127,5 +127,5 @@ class DebugView:
 
         if frame.t < self.flash[1]:
             cv2.putText(img, self.flash[0], (w // 2 - 80, 70), cv2.FONT_HERSHEY_DUPLEX, 1.5, YELLOW, 3, cv2.LINE_AA)
-        cv2.putText(img, KEYS, (12, h - 12), FONT, 0.45, WHITE, 1, cv2.LINE_AA)
+        cv2.putText(img, KEYS, (12, h - 12), FONT, 0.4, WHITE, 1, cv2.LINE_AA)
         return img

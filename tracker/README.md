@@ -39,7 +39,11 @@ Stand 4 to 5 ft back with your shoulders in frame. Light your face and hands.
 | `--replay file.jsonl` | run the detectors over a recording, no camera |
 | `--set key=value` | override anything in [config.py](config.py), repeatable |
 
-Keys in the window: **Q** quit, **C** calibrate (shoot the 4 red targets), **N** recenter stance, **F** flick trigger on/off, **R** record on/off.
+The window opens fullscreen on purpose: the crosshair is mapped to the whole screen, like the game's will be, so in a small window it would travel less than your finger points. `--windowed` or **W** changes that.
+
+Keys: **Q** quit, **X** centre the crosshair on where you are pointing now, **[ ]** sensitivity down/up, **C** calibrate (shoot the 4 red targets), **N** recenter stance, **F** recoil trigger on/off, **R** record on/off, **W** fullscreen on/off.
+
+Tell it about the real screen and camera once per setup: `--set screen_width_m=1.2` for a 55 inch TV (default 0.30, a laptop), `--set camera_hfov_deg=78` for a wide webcam (default 60).
 
 ## Reading the window
 
@@ -54,7 +58,7 @@ Keys in the window: **Q** quit, **C** calibrate (shoot the 4 red targets), **N**
 ## First session checklist
 
 1. 25+ fps in the corner. If not: `--pose-every 2`, close other apps.
-2. TRACK and AIM light up. Crosshair follows your hand and reaches all four corners comfortably. Too twitchy or too sluggish: change `aim_span_x` (metres of real hand travel per screen width, bigger = less sensitive), or press **C**.
+2. Raise your finger gun pointing at the middle of the screen. TRACK and AIM light up and the crosshair appears **in the middle**, wherever your hand is. Pivot to point at each corner: the crosshair should travel about as far as your finger points. Not far enough: **]**. Too far or too shaky: **[**. It prints the value, keep it with `--set aim_gain=...`. Drifted: **X**.
 3. Fire 20 thumb shots at one spot: pop the thumb up, drop it. Want 18+ to register, none while just aiming. Missing shots: lower `thumb_drop_frac`. Firing by itself: raise it.
 4. Fire 10 recoil shots: kick the fingertip up. Small kicks not registering: lower `flick_rise_m` (0.04). It costs false shots when you re-aim upward fast, which is why it is 0.05.
 5. Red X should land where you were aiming *before* the trigger motion, not where your hand ended up.
@@ -102,7 +106,7 @@ Synthetic landmarks, no camera. They check the logic (one shot per pull, aim rew
 | [landmarks.py](landmarks.py) | MediaPipe hand + body models on two threads, record/replay |
 | [hand_features.py](hand_features.py) | the hand's image scale (how we get real centimetres), open palm, thumb feature |
 | [body.py](body.py) | chest depth from shoulder width, chest anchor, lean, duck, stance baseline |
-| [aim.py](aim.py) | hand position relative to chest in metres -> screen, calibration, aim history |
+| [aim.py](aim.py) | fingertip position relative to the chest -> screen: geometric gain, learned centre, edge push, calibration, aim history |
 | [trigger.py](trigger.py) | thumb drop and recoil kick, each reporting when the gesture *began* |
 | [reload.py](reload.py) | a kick while the hands are together is a reload, a kick with them apart is a shot |
 | [pipeline.py](pipeline.py) | ties it together, no camera or network inside so it can be tested |
@@ -119,5 +123,7 @@ Thresholds marked `[rec]` in [config.py](config.py) come from replaying a real 7
 - The thumb landmarks are garbage while the hand moves, which fired stray shots during recoil. The thumb trigger skips those frames and looks for a relative drop from its own recent peak.
 - Real recoil kicks took ~0.25 s to rise, not a sharp 0.1 s snap.
 - A slap looks exactly like a recoil kick. The difference is where the other hand is.
+- "The crosshair is not where my finger points." True, and it cannot be computed: a ray along the finger, wrist-to-tip and elbow-to-tip rays were all tried on the recordings and land tens of centimetres off screen with 1-4 cm of jitter, because a finger pointed at the camera is foreshortened to nothing. Fingertip *position* is steady to ~2 mm. So aim is fingertip position, with the gain real geometry gives (eye distance / arm reach, ~16 cm of fingertip travel per laptop screen), a centre learned from where the player first points, and a mouse-style push at the screen edges so it can never sit stuck off screen.
+- Recoil shots landed a median 7.5% of the screen (worst 17%) off target, because a kick is only recognisable a few frames in and the aim was taken from there. Shots now use the median aim over the 0.15 s *before* the gesture began.
 
 **Do not upgrade mediapipe.** `requirements.txt` pins `0.10.21` on purpose. On macOS, `1.0.1` aborts at load on the CPU path, and its GPU path leaks about 10 MB per frame until the process dies a couple of minutes in (this killed a live test). `0.10.21` on CPU holds ~24 ms per frame at a flat ~300 MB on an M3.
