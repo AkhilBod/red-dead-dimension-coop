@@ -260,16 +260,29 @@ class PipelineTests(unittest.TestCase):
         sim.run(1.2, wobble)
         self.assertTrue(sim.pipeline.mapper.centered)
 
-    def test_pushing_past_the_edge_does_not_lose_the_crosshair(self):
+    def test_a_flick_into_the_corner_and_back_returns_to_the_same_aim(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        before = sim.run(0.8, lambda k: aiming(wrist))
+        far = wrist + np.array([1.2, -0.8]) * SW             # well past the top-right corner
+        sim.run(0.15, lambda k: aiming(wrist + (far - wrist) * k))
+        pinned = sim.run(0.15, lambda k: aiming(far))
+        self.assertEqual((pinned.aim_x, pinned.aim_y), (1.0, 0.0))
+        sim.run(0.15, lambda k: aiming(far + (wrist - far) * k))
+        after = sim.run(0.6, lambda k: aiming(wrist))
+        self.assertAlmostEqual(after.aim_x, before.aim_x, delta=0.1)
+        self.assertAlmostEqual(after.aim_y, before.aim_y, delta=0.15)
+
+    def test_a_hand_held_past_the_edge_gets_the_crosshair_back(self):
         sim = Sim()
         wrist = rest_wrist()
         sim.run(0.8, lambda k: aiming(wrist))
-        far = wrist + np.array([3.0, 0.0]) * SW             # way past the right edge of the screen
-        pinned = sim.run(0.6, lambda k: aiming(wrist + (far - wrist) * k))
-        self.assertEqual(pinned.aim_x, 1.0)
-        back = far - np.array([0.15, 0.0]) * SW             # a small move back...
+        far = wrist + np.array([1.2, 0.0]) * SW
+        sim.run(0.4, lambda k: aiming(wrist + (far - wrist) * k))
+        sim.run(3.0, lambda k: aiming(far))                  # player is simply standing further right than the centre assumed
+        back = far - np.array([0.2, 0.0]) * SW
         state = sim.run(0.6, lambda k: aiming(far + (back - far) * k))
-        self.assertLess(state.aim_x, 0.95)                  # ...comes straight off the edge, like a mouse
+        self.assertLess(state.aim_x, 0.97)
 
     def test_recenter_command_centres_the_crosshair(self):
         sim = Sim()
@@ -380,22 +393,29 @@ class RecordedSessionRegressions(unittest.TestCase):
         self.assertIsNone(sim.pipeline.debug["off"])
         self.assertEqual(sim.events, [])
 
-    def test_crosshair_travel_follows_real_distance_and_geometry(self):
+    def test_crosshair_travel_follows_real_distance_not_image_distance(self):
         # Seated at a laptop the hand is ~2.6x nearer the camera than the chest, so it moves 2.6x
-        # further in the image. What counts is real fingertip travel, times the eye-to-fingertip
-        # lever for those depths. Here: 5 real centimetres.
+        # further in the image. Five real centimetres must be the same crosshair travel either way.
         cfg = Config()
-        focal = 0.5 * ASPECT / np.tan(np.radians(cfg.camera_hfov_deg) / 2)
-        z_chest = focal / synth.M
         for zoom in (1.8, 2.6):
             sim = Sim()
             a = rest_wrist()
             b = a + np.array([0.05 * synth.M * zoom, 0.0])
             start = sim.run(0.8, lambda k: ([make_hand(a, zoom=zoom)], make_pose(wrists={"R": tuple(a)})))
             end = sim.run(0.8, lambda k: ([make_hand(b, zoom=zoom)], make_pose(wrists={"R": tuple(b)})))
-            lever = z_chest / (z_chest - (focal / (synth.M * zoom) - cfg.finger_reach_m))
-            expected = 0.05 * lever * cfg.aim_gain / cfg.screen_width_m
-            self.assertAlmostEqual(end.aim_x - start.aim_x, expected, delta=0.12 * expected)
+            self.assertAlmostEqual(end.aim_x - start.aim_x, 0.05 / cfg.aim_span_m, delta=0.02)
+
+    def test_aim_near_the_edge_of_the_camera_frame_survives_scale_wobble(self):
+        # Seen live: the crosshair went wrong whenever it neared a corner. The hand's image scale is
+        # an estimate that wobbles as the hand turns. Here the hand sits far from the image centre
+        # and only its apparent size changes by 8%: the crosshair must barely notice.
+        sim = Sim()
+        corner = np.array([0.88 * ASPECT, 0.2])
+        pose = lambda: make_pose(wrists={"R": tuple(corner)})
+        before = sim.run(1.0, lambda k: ([make_hand(corner, zoom=2.4)], pose()))
+        after = sim.run(1.0, lambda k: ([make_hand(corner, zoom=2.4 * 1.08)], pose()))
+        self.assertAlmostEqual(after.aim_x, before.aim_x, delta=0.04)
+        self.assertAlmostEqual(after.aim_y, before.aim_y, delta=0.04)
 
     def test_gun_lock_does_not_slide_onto_the_slapping_hand(self):
         sim = Sim()

@@ -2,8 +2,6 @@
 can be tested and replayed offline."""
 from dataclasses import dataclass
 
-import math
-
 import numpy as np
 
 import protocol as P
@@ -47,14 +45,17 @@ class Pipeline:
         self.gun_scale = TimedWindow(cfg.hand_scale_window_s)
         self.thumb = ThumbTrigger(cfg)
         self.flick = FlickTrigger(cfg)
-        self.off_flick = FlickTrigger(cfg)      # the other hand's kicks only ever mean "reload"
+        # With the hands together a kick can only be a slap, so it may be a gentler one than a shot needs.
+        self.slap_kick = FlickTrigger(cfg, cfg.slap_kick_m)
+        self.off_flick = FlickTrigger(cfg, cfg.slap_kick_m)     # the other hand's kicks only ever mean "reload"
         self.reload = ReloadDetector(cfg)
         self.aim = (0.5, 0.5)
         self.gun_pos = None
         self.gun_center = None
         self.gun_seen_t = -1e9
         self.hand_speed = 0.0       # m/s
-        self.lever = 2.0            # screen travel per fingertip travel, from the depths of chest and hand
+        self.ref_tip = None         # image points the aim measures travel from (fingertip, chest)
+        self.ref_chest = None
         self.still_since = None     # for learning the aim centre
         self.centering = []
         self.lock_t = None
@@ -140,6 +141,7 @@ class Pipeline:
         self.gun_scale.clear()
         self.thumb.reset()
         self.flick.reset()
+        self.slap_kick.reset()
         self.pending_kick = None
 
     def _pick_gun(self, infos, t, hands_apart):
@@ -191,8 +193,8 @@ class Pipeline:
             return
         if kind != self.last_fire_kind and since < cfg.other_trigger_lockout_s:
             return                  # thumb drop followed by its own recoil kick: one shot
-        x, y = self.mapper.map(raw, self.lever * cfg.aim_gain, push=False)
-        self.mapper.add_shot(raw, self.lever * cfg.aim_gain)
+        x, y = self.mapper.map(raw)
+        self.mapper.add_shot(raw)
         events.append(("fire", x, y, kind))
         self.last_fire_t, self.last_fire_kind = t, kind
 
@@ -212,9 +214,10 @@ class Pipeline:
         events = []
 
         body.update(t, frame.pose, aspect)
-        if body.anchor is not None and body.tracking(t):
+        if body.anchor is not None:
+            # Also while the body is briefly lost: a stale chest barely matters, a made-up one would jump the aim.
             anchor, aim_anchor, sw = body.anchor, body.anchor_raw, body.sw
-            holster_y = body.holster_y()
+            holster_y = body.holster_y() if body.tracking(t) else 0.85
         else:
             anchor = aim_anchor = np.array([0.5 * aspect, 0.55])
             sw, holster_y = cfg.fallback_sw, 0.85
@@ -240,27 +243,27 @@ class Pipeline:
 
         steady = False
         if gun is not None:
+            dt = min(0.1, t - self.gun_seen_t) if had_lock else 0.0
             if not had_lock or self.gun_pos is None:
                 if t - self.gun_seen_t > cfg.aim_recenter_after_s:
                     self.mapper.forget_center()     # hand was away a while: it will not come back to the same spot
+                    self.ref_tip = None
                 self._drop_gun_lock()               # start filters and triggers clean
             self._learn_gun_arm(gun)
 
-            # Fingertip travel in real metres: divide by the hand's OWN image scale. The hand is
-            # much nearer the camera than the chest, so chest-scaled motion is magnified 2-3x.
-            # Measured relative to the chest, so stepping aside to dodge does not drag the aim.
+            # How far the fingertip has moved, in real metres: image travel divided by the hand's OWN
+            # image scale (the hand is 2-3x nearer the camera than the chest). Minus how far the chest
+            # has moved, so stepping aside to dodge does not drag the aim.
+            # Travel from a fixed reference point, not position in the frame: the scale estimate
+            # wobbles a few percent as the hand turns, and a few percent of "40% across the image" is
+            # centimetres of error. Seen live as the crosshair going wrong whenever it neared a corner.
             self.gun_scale.push(t, gun.scale)
             scale = self.gun_scale.median()
-            centre = np.array([0.5 * aspect, 0.5])
-            raw = self.aim_filter((gun.p2[INDEX_TIP] - centre) / scale - (aim_anchor - centre) / chest_scale, t)
+            tip = gun.p2[INDEX_TIP]
+            if self.ref_tip is None:
+                self.ref_tip, self.ref_chest = tip.copy(), aim_anchor.copy()
+            raw = self.aim_filter((tip - self.ref_tip) / scale - (aim_anchor - self.ref_chest) / chest_scale, t)
             self.history.push(t, raw)
-
-            focal = 0.5 * aspect / math.tan(math.radians(cfg.camera_hfov_deg) / 2.0)    # in image heights
-            z_chest, z_tip = focal / chest_scale, max(0.15, focal / scale - cfg.finger_reach_m)
-            lever = float(np.clip(z_chest / max(z_chest - z_tip, 0.05), cfg.aim_lever_min, cfg.aim_lever_max))
-            # Slow on purpose: depth estimates wobble, and the lever multiplies the whole aim.
-            blend = min(1.0, (t - self.gun_seen_t) / 1.0) if had_lock else 1.0
-            self.lever += (lever - self.lever) * blend
 
             if self.gun_center is not None and t > self.gun_seen_t:
                 v = _dist(gun.center, self.gun_center) / (t - self.gun_seen_t) / scale
@@ -292,9 +295,12 @@ class Pipeline:
             # crosshair holds still. And only a hand moving at a human pace may push the mapping off
             # a screen edge: a tracking jump must not drag the centre away with it.
             if hands_apart:
-                self.aim = self.mapper.map(raw, self.lever * cfg.aim_gain, push=self.hand_speed < cfg.aim_push_max_speed)
+                self.aim = self.mapper.map(raw, dt if self.hand_speed < cfg.aim_push_max_speed else 0.0)
 
-            kick_onset = self.flick.update(t, (gun.p2[WRIST][1] - gun.p2[INDEX_TIP][1]) / scale)
+            tip_rise = (gun.p2[WRIST][1] - gun.p2[INDEX_TIP][1]) / scale
+            kick_onset = self.flick.update(t, tip_rise)
+            if self.slap_kick.update(t, tip_rise) is not None and self.reload.together(t):
+                self._reload(events, t)
             steady = self.hand_speed < cfg.thumb_max_speed and self.flick.swing(cfg.thumb_swing_s) < cfg.thumb_max_swing
             thumb_onset = self.thumb.update(t, thumb_feature(gun.hand), steady)
 
@@ -374,7 +380,7 @@ class Pipeline:
 
         self.debug = {
             "infos": infos, "gun": gun, "off": off, "anchor": anchor, "sw": sw, "holster_y": holster_y,
-            "body_visible": body.visible, "gun_arm": self.gun_arm, "steady": steady, "lever": self.lever,
+            "body_visible": body.visible, "gun_arm": self.gun_arm, "steady": steady,
             "rejected": len(frame.hands) - len(infos),
         }
         state = P.State(

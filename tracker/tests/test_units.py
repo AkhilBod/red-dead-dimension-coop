@@ -30,24 +30,39 @@ class OneEuroTests(unittest.TestCase):
 class AimMapperTests(unittest.TestCase):
     def test_uncentred_maps_to_the_middle(self):
         m = AimMapper(Config())
-        self.assertEqual(m.map(np.array([0.3, -0.2]), 2.0), (0.5, 0.5))
+        self.assertEqual(m.map(np.array([0.3, -0.2])), (0.5, 0.5))
 
-    def test_centre_gain_and_lever(self):
+    def test_a_fixed_physical_sensitivity(self):
         cfg = Config()
         m = AimMapper(cfg)
         m.center_on(np.array([0.2, -0.1]))
-        self.assertEqual(m.map(np.array([0.2, -0.1]), 2.0), (0.5, 0.5))
-        x, _ = m.map(np.array([0.2 + 0.03, -0.1]), 2.0)
-        self.assertAlmostEqual(x, 0.5 + 0.03 * 2.0 / cfg.screen_width_m)
+        self.assertEqual(m.map(np.array([0.2, -0.1])), (0.5, 0.5))
+        x, y = m.map(np.array([0.2 + 0.09, -0.1 + 0.05]))
+        self.assertAlmostEqual(x, 0.5 + 0.09 / cfg.aim_span_m)
+        self.assertAlmostEqual(y, 0.5 + 0.05 / (cfg.aim_span_m / cfg.screen_aspect))
 
-    def test_edge_push_drags_the_centre(self):
+    def test_flicking_into_a_corner_and_back_leaves_the_mapping_alone(self):
         m = AimMapper(Config())
         m.center_on(np.array([0.0, 0.0]))
-        self.assertEqual(m.map(np.array([1.0, 0.0]), 2.0)[0], 1.0)           # far past the right edge
-        self.assertLess(m.map(np.array([0.98, 0.0]), 2.0)[0], 0.9)           # 2 cm back is already well on screen
+        for _ in range(6):                                          # 0.2 s well past the top-right corner
+            self.assertEqual(m.map(np.array([0.5, -0.5]), dt=1 / 30), (1.0, 0.0))
+        x, y = m.map(np.array([0.0, 0.0]), dt=1 / 30)
+        self.assertAlmostEqual(x, 0.5, delta=0.12)
+        self.assertAlmostEqual(y, 0.5, delta=0.2)
+
+    def test_holding_past_an_edge_pulls_the_centre_along(self):
+        m = AimMapper(Config())
         m.center_on(np.array([0.0, 0.0]))
-        m.map(np.array([1.0, 0.0]), 2.0, push=False)
-        self.assertEqual(m.map(np.array([0.98, 0.0]), 2.0)[0], 1.0)          # without the push it would still be lost
+        for _ in range(90):                                         # 3 s held way out to the right
+            m.map(np.array([0.6, 0.0]), dt=1 / 30)
+        self.assertLess(m.map(np.array([0.55, 0.0]))[0], 0.9)       # a small move back is already on screen again
+
+    def test_reading_does_not_move_the_centre(self):
+        m = AimMapper(Config())
+        m.center_on(np.array([0.0, 0.0]))
+        for _ in range(90):
+            m.map(np.array([0.6, 0.0]))                             # dt = 0: a shot looking up its aim, not a frame
+        np.testing.assert_allclose(m.center, [0.0, 0.0])
 
     def test_calibration_gain_is_clamped(self):
         cfg = Config()
@@ -56,14 +71,14 @@ class AimMapperTests(unittest.TestCase):
         # Player barely moved their hand between the left and right targets.
         for raw, target in (((0.500, -0.2), (0.15, 0.5)), ((0.505, -0.2), (0.85, 0.5)), ((0.502, -0.3), (0.5, 0.2))):
             m.set_target(*target)
-            self.assertTrue(m.add_shot(np.array(raw), 2.0))
+            self.assertTrue(m.add_shot(np.array(raw)))
         self.assertAlmostEqual(m.k[0], cfg.calib_gain_max)
 
     def test_shots_without_a_pending_target_are_ignored(self):
         m = AimMapper(Config())
-        self.assertFalse(m.add_shot(np.array([0.0, 0.0]), 2.0))
+        self.assertFalse(m.add_shot(np.array([0.0, 0.0])))
         m.begin()
-        self.assertFalse(m.add_shot(np.array([0.0, 0.0]), 2.0))
+        self.assertFalse(m.add_shot(np.array([0.0, 0.0])))
         self.assertFalse(m.calibrated)
 
 

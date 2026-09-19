@@ -65,8 +65,9 @@ class FlickTrigger:
     """Recoil kick: the fingertip rises relative to the wrist, i.e. the hand ROTATES up.
     Re-aiming translates the whole hand and barely changes this, so it does not fire."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, rise_m=None):
         self.cfg = cfg
+        self.rise_m = rise_m                # None = follow cfg.flick_rise_m, so it can be tuned live
         self.window = TimedWindow(cfg.flick_baseline_s)
         self.reset()
 
@@ -92,6 +93,7 @@ class FlickTrigger:
         if self.last_t is not None and t - self.last_t > cfg.trigger_gap_reset_s:
             self.reset()
         self.last_t = t
+        need = cfg.flick_rise_m if self.rise_m is None else self.rise_m
         self.window.push(t, g)
         base = min(v for _, v in self.window.buf)
         self.rise = g - base
@@ -104,11 +106,11 @@ class FlickTrigger:
         if not self.armed:
             self.count = 0
             came_down = g <= self.fired_level - cfg.flick_rearm_frac * self.fired_rise
-            if came_down or self.rise < 0.4 * cfg.flick_rise_m:
+            if came_down or self.rise < 0.4 * need:
                 self.armed = True
             return None
 
-        kicked = self.rise >= cfg.flick_rise_m and t - onset <= cfg.flick_max_rise_s
+        kicked = self.rise >= need and t - onset <= cfg.flick_max_rise_s
         self.count = self.count + 1 if kicked else 0
         if self.count < cfg.flick_confirm_frames:
             return None

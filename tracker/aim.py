@@ -41,32 +41,39 @@ class AimHistory:
 
 
 class AimMapper:
-    """screen = 0.5 + k * lever * (raw - centre) / screen size, per axis.
+    """screen = 0.5 + k * (raw - centre) / span, per axis.
 
-    raw   = fingertip position relative to the chest, real metres.
-    lever = how much further a ray from the eyes through the fingertip moves on the screen
-            than the fingertip itself does: eye distance / arm reach, about 2 at a laptop.
-            This is what makes the crosshair travel as far as the finger points.
-    k     = calibration's correction to that geometric gain, 1 until calibrated.
+    raw  = how far the fingertip has moved, relative to the chest, in real metres.
+    span = metres of fingertip travel that cross the screen (cfg.aim_span_m wide, and the
+           matching height). A fixed, physical sensitivity: it feels the same seated at a
+           laptop or standing across a room, and it does not change while you aim.
+    k    = calibration's correction to that, 1 until calibrated.
 
-    The centre cannot be computed: people do not sight down their finger, they hold the
-    hand off to one side and point "from the hip", and nothing in the landmarks says where
-    that arm thinks the middle of the screen is. So it is learned:
-      - the first place a player steadily points counts as the middle of the screen,
-      - pushing past a screen edge drags the centre along, exactly like a mouse at the edge
-        of a monitor, so the crosshair can never sit stuck outside the screen,
+    This is deliberately a steady, slightly heavy pointer and not a "true" one. Working out
+    where a finger really points was tried on recorded sessions and cannot be done from these
+    landmarks (see config.py), and a twitchy crosshair feels nothing like a gun.
+
+    The centre cannot be computed either: people hold the hand off to one side and point
+    "from the hip", and nothing says where that arm thinks the middle of the screen is. So:
+      - where a player first points counts as the middle of the screen,
+      - holding the hand past a screen edge slowly pulls the centre along, so the crosshair
+        never stays lost. Slowly on purpose: flicking into a corner and back must NOT move the
+        mapping (seen live: an instant version left the crosshair off after every corner),
       - calibration shots from the game replace both k and the centre.
     """
 
     def __init__(self, cfg):
         self.cfg = cfg
-        self.size = np.array([cfg.screen_width_m, cfg.screen_width_m / cfg.screen_aspect])
         self.k = np.ones(2)
         self.center = None
         self.calibrated = False
         self.active = False
         self.pending = None
         self.pairs = []
+
+    @property
+    def span(self):
+        return np.array([self.cfg.aim_span_m, self.cfg.aim_span_m / self.cfg.screen_aspect])
 
     @property
     def centered(self):
@@ -81,14 +88,18 @@ class AimMapper:
         and the crosshair stayed pinned to the left edge for the rest of the session."""
         self.center = None
 
-    def map(self, raw, lever, push=True):
+    def map(self, raw, dt=0.0):
+        """dt > 0 lets a hand held past an edge pull the centre along. dt = 0 only reads."""
         if self.center is None or raw is None:
             return 0.5, 0.5
-        slope = self.k * lever / self.size
+        slope = self.k / self.span
         s = 0.5 + slope * (raw - self.center)
         clipped = np.clip(s, 0.0, 1.0)
-        if push:
-            self.center += (s - clipped) / slope
+        if dt > 0:
+            # A steady pace, not a share of the overshoot: a quick flick far past the corner must
+            # move the mapping no more than a small one does.
+            step = self.cfg.aim_edge_pull_rate * dt
+            self.center += np.clip(s - clipped, -step, step) / slope
         return float(clipped[0]), float(clipped[1])
 
     def begin(self):
@@ -103,11 +114,11 @@ class AimMapper:
             self.begin()
         self.pending = np.array([sx, sy], dtype=float)
 
-    def add_shot(self, raw, lever):
+    def add_shot(self, raw):
         """Pair a shot with the pending target. True if the shot was used."""
         if not self.active or self.pending is None or raw is None:
             return False
-        self.pairs.append((np.array(raw, dtype=float), self.pending, float(lever)))
+        self.pairs.append((np.array(raw, dtype=float), self.pending))
         self.pending = None
         self._solve()
         if len(self.pairs) >= self.cfg.calib_points:
@@ -116,18 +127,17 @@ class AimMapper:
 
     def _solve(self):
         """Least squares per axis. k may only move so far from 1: four noisy shots should
-        correct the geometric gain, not replace it with something twitchy."""
+        correct the sensitivity, not replace it with something twitchy."""
         cfg = self.cfg
         raws = np.array([p[0] for p in self.pairs])
         targets = np.array([p[1] for p in self.pairs])
-        lever = float(np.median([p[2] for p in self.pairs]))
         k = np.ones(2)
         for axis in range(2):
             r, s = raws[:, axis], targets[:, axis]
             if np.ptp(s) > 0.2 and np.ptp(r) > 1e-6:
                 slope = float(np.polyfit(r, s, 1)[0])
                 if slope > 0:
-                    k[axis] = float(np.clip(slope * self.size[axis] / lever, cfg.calib_gain_min, cfg.calib_gain_max))
+                    k[axis] = float(np.clip(slope * self.span[axis], cfg.calib_gain_min, cfg.calib_gain_max))
         self.k = k
-        self.center = raws.mean(axis=0) - (targets.mean(axis=0) - 0.5) * self.size / (k * lever)
+        self.center = raws.mean(axis=0) - (targets.mean(axis=0) - 0.5) * self.span / k
         self.calibrated = True

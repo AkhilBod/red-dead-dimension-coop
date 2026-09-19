@@ -25,7 +25,7 @@ def capture(pipeline, frame, state):
         "body": None, "holster_y": dbg.get("holster_y", 0.85),
         "target": None if mapper.pending is None else mapper.pending.copy(), "calib_n": len(mapper.pairs), "calib_points": cfg.calib_points,
         "mode": "calibrated" if mapper.calibrated else ("centred" if mapper.centered else "centring..."),
-        "gun_arm": dbg.get("gun_arm"), "lever": dbg.get("lever", 0.0), "aim_gain": cfg.aim_gain,
+        "gun_arm": dbg.get("gun_arm"), "aim_span_m": cfg.aim_span_m,
         "has_gun": gun is not None, "steady": dbg.get("steady", False),
         "thumb_f": pipeline.thumb.f, "thumb_peak": pipeline.thumb.peak, "thumb_armed": pipeline.thumb.armed,
         "kick": pipeline.flick.rise, "kick_armed": pipeline.flick.armed and cfg.flick_enabled,
@@ -129,7 +129,7 @@ class DebugView:
             img[y0:y1, x0:x1] = (img[y0:y1, x0:x1] * 0.35).astype(np.uint8)     # dark backing so text reads over video
         fps_color = WHITE if fps >= 25 else (YELLOW if fps >= 20 else RED)
         cv2.putText(img, f"{fps:4.1f} fps", (12, 22), FONT, 0.55, fps_color, 2 if fps < 25 else 1, cv2.LINE_AA)
-        cv2.putText(img, f"{ms:4.0f} ms   gun arm {m['gun_arm'] or '?'}   gain {m['aim_gain']:.2f} x lever {m['lever']:.1f}   {m['mode']}   {glove}"
+        cv2.putText(img, f"{ms:4.0f} ms   gun arm {m['gun_arm'] or '?'}   screen = {m['aim_span_m'] * 100:.0f} cm of hand travel   {m['mode']}   {glove}"
                          f"{'   REC' if recording else ''}", (100, 22), FONT, 0.55, WHITE, 1, cv2.LINE_AA)
         flags = [("TRACK", state.tracking), ("GUN", state.gun_pose), ("AIM", state.aim_valid),
                  ("HOLSTER", state.holstered), ("OPEN", state.off_hand_open)]

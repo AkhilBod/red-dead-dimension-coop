@@ -64,9 +64,11 @@ class Landmarker:
     Two hand models, not one. Asked for 2 hands while only 1 is in view, MediaPipe re-runs
     its expensive palm SEARCH on every frame looking for the other (measured: 48 ms a frame
     instead of 26). But the second hand only matters for a reload or an open palm. So the
-    1-hand model runs normally, the 2-hand model takes a look every few frames, and only
-    while it really sees two hands does it take over (tracking two known hands is cheap,
-    it is the searching that costs).
+    1-hand model runs normally, and the 2-hand model takes over when the second hand is
+    likely to matter: the body model sees the other wrist come near the gun hand (a reload
+    slap) or sees both wrists up (an open palm). It also takes a look every few frames
+    regardless, and stays on while it really sees two hands: tracking two known hands is
+    cheap, it is the searching that costs.
     """
 
     def __init__(self, cfg, num_hands=2, pose_every=1, delegate=None):
@@ -104,6 +106,7 @@ class Landmarker:
         self._since_scan = 0
         self._seeing_two = False
         self._misses = 0
+        self._cue_off_until = -1
         self._pose = self._pose_thread.submit(lambda: vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
             base_options=base(model_asset_path=str(MODELS_DIR / "pose_landmarker_lite.task"), delegate=device),
             running_mode=vision.RunningMode.VIDEO,
@@ -122,7 +125,8 @@ class Landmarker:
             image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
         ts = max(int(t * 1000), self._last_ts + 1)
         self._last_ts = ts
-        look_for_two = self._two_hands is not None and (self._seeing_two or self._since_scan >= self._scan_every)
+        cue = self._other_hand_likely(bgr.shape[1] / bgr.shape[0])
+        look_for_two = self._two_hands is not None and (self._seeing_two or cue or self._since_scan >= self._scan_every)
         hands_job = self._hand_thread.submit((self._two_hands if look_for_two else self._one_hand).detect_for_video, image, ts)
         # The body model never holds a frame up. If the last body job is still running (busy
         # machine), skip starting another and carry on with the newest body we have: a slightly
@@ -142,6 +146,8 @@ class Landmarker:
                 self._misses += 1
                 if self._misses >= 3:
                     self._seeing_two = False
+                if cue and self._misses >= 20:
+                    self._cue_off_until = ts + 2000     # body model says "two hands", hand model cannot find one: stop paying for the search
         else:
             self._since_scan += 1
         hands = []
@@ -157,6 +163,17 @@ class Landmarker:
             except StillRunning:
                 pass
         return Frame(t, bgr.shape[1] / bgr.shape[0], hands, self._last_pose)
+
+    def _other_hand_likely(self, aspect):
+        """From the last body result: is the other hand somewhere it would matter?"""
+        pose = self._last_pose
+        if pose is None or self._last_ts < self._cue_off_until or min(pose.vis[15], pose.vis[16], pose.vis[11], pose.vis[12]) < 0.5:
+            return False
+        p = pose.pts[:, :2] * np.array([aspect, 1.0])
+        sw = np.linalg.norm(p[11] - p[12])
+        together = np.linalg.norm(p[15] - p[16]) < 1.0 * sw                    # [rec] one-handed shooting keeps them 1.1-1.7 apart
+        both_up = max(p[15][1], p[16][1]) < min(p[11][1], p[12][1]) + 0.45 * sw
+        return bool(together or both_up)
 
     def _take_pose(self):
         pr, self._pose_job = self._pose_job.result(), None

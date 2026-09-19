@@ -192,8 +192,8 @@ class Tracker(threading.Thread):
         elif key == "x":
             pipeline.recenter_aim = True
         elif key in "[]":
-            cfg.aim_gain = round(max(0.2, min(3.0, cfg.aim_gain * (1.15 if key == "]" else 1 / 1.15))), 3)
-            print(f"[tracker] aim_gain = {cfg.aim_gain}   (keep it with: --set aim_gain={cfg.aim_gain})")
+            cfg.aim_span_m = round(max(0.12, min(0.9, cfg.aim_span_m * (1 / 1.12 if key == "]" else 1.12))), 3)
+            print(f"[tracker] {cfg.aim_span_m * 100:.0f} cm of fingertip travel crosses the screen   (keep it with: --set aim_span_m={cfg.aim_span_m})")
         elif key == "f":
             cfg.flick_enabled = not cfg.flick_enabled
             print(f"[tracker] recoil trigger {'on' if cfg.flick_enabled else 'off'}")
