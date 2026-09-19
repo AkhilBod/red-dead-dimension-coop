@@ -96,6 +96,39 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sim.count("reload"), 1)
         self.assertEqual(sim.count("fire"), 0)
 
+    def test_slap_seen_late_by_the_body_model_does_not_fire(self):
+        # Seen live: FIRE, then RELOAD 0.07-0.16s later. The hand model never sees the slapping
+        # hand and the body model's wrist lags the real one, so the knock at contact reads as a
+        # recoil flick before the reload is recognised.
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(0.8, lambda k: aiming(wrist))
+        start, end = wrist + np.array([0.1, 1.6]) * SW, wrist + np.array([0.0, 0.2]) * SW
+        lag, travel = 0.15, 0.25
+
+        def off_wrist(elapsed):             # where the body model THINKS the off hand is
+            k = min(1.0, max(0.0, (elapsed - lag) / travel))
+            return start + (end - start) * k
+        t0 = sim.t
+        sim.run(travel, lambda k: aiming(wrist, left_wrist=off_wrist(sim.t - t0)))
+        knocked = wrist + np.array([0.0, -0.15]) * SW
+        sim.run(0.1, lambda k: aiming(knocked, pitch=0.4, left_wrist=off_wrist(sim.t - t0)))
+        sim.run(0.3, lambda k: aiming(wrist, left_wrist=off_wrist(sim.t - t0)))
+        sim.run(0.4, lambda k: aiming(wrist, left_wrist=start))
+        self.assertEqual(sim.count("reload"), 1)
+        self.assertEqual(sim.count("fire"), 0)
+
+    def test_shot_with_the_other_hand_nearby_still_fires(self):
+        # Two-handed grip: the shot may be held briefly, but it must come out.
+        sim = Sim()
+        wrist = rest_wrist()
+        support = wrist + np.array([0.0, 0.3]) * SW
+        sim.run(0.8, lambda k: aiming(wrist, left_wrist=support))
+        sim.run(0.1, lambda k: aiming(wrist, thumb=k, left_wrist=support))
+        sim.run(0.5, lambda k: aiming(wrist, thumb=1.0, left_wrist=support))
+        self.assertEqual(sim.count("fire"), 1)
+        self.assertEqual(sim.count("reload"), 0)
+
     def test_lean_moves_the_view_but_not_the_aim(self):
         sim = Sim()
         before = sim.run(0.8, lambda k: aiming(rest_wrist()))

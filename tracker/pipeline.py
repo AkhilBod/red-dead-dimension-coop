@@ -45,6 +45,7 @@ class Pipeline:
         self.chain_votes = 0
         self.side = 1               # +1 if that arm is on the right of the mirrored image
         self.last_fire_t = -1e9
+        self.held_shot = None       # (release time, raw aim) while we wait to see if it was a slap
         self.gun_pose = False
         self.gun_pose_frames = 0
         self.gun_pose_true_t = -1e9
@@ -62,6 +63,11 @@ class Pipeline:
             self.mapper.set_target(args[0], args[1])
         elif address == P.ADDR_RECENTER:
             self.body.recenter()
+
+    def _emit_fire(self, events, raw):
+        x, y = self.mapper.map(raw, self.side)
+        self.mapper.add_shot(raw)
+        events.append(("fire", x, y))
 
     def _drop_gun_lock(self):
         self.gun_pos = None
@@ -160,13 +166,22 @@ class Pipeline:
         recently_armed = t - self.gun_seen_t < 1.0
         if self.reload.update(t, gun.wrist if gun else None, off.center if off else None, pose_gun, pose_off, sw) and recently_armed:
             events.append(("reload",))
+            self.held_shot = None           # that "shot" was the slap knocking the hand
 
         if onset is not None and t - self.last_fire_t >= cfg.fire_cooldown_s and not self.reload.fire_suppressed(t):
             raw_then = self.history.at(max(onset - cfg.rewind_margin_s, t - cfg.rewind_max_s))
-            x, y = self.mapper.map(raw_then, self.side)
-            self.mapper.add_shot(raw_then)
-            events.append(("fire", x, y))
             self.last_fire_t = t
+            # The slap's knock can look like a trigger pull a few frames BEFORE the reload is
+            # recognised. If the other hand is close, wait a moment before committing to the
+            # shot. With the other hand out of the way (the normal case) nothing is delayed.
+            near = [p for p in (off.center if off else None, pose_off) if p is not None]
+            if gun is not None and any(_dist(p, gun.wrist) < cfg.fire_hold_radius * sw for p in near):
+                self.held_shot = (t + cfg.fire_hold_s, raw_then)
+            else:
+                self._emit_fire(events, raw_then)
+        if self.held_shot is not None and t >= self.held_shot[0]:
+            self._emit_fire(events, self.held_shot[1])
+            self.held_shot = None
 
         # Debounced flags.
         if gun is not None and gun.gun:

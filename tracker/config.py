@@ -25,7 +25,7 @@ class Config:
     aim_tip_weight: float = 0.35    # 0 = index knuckle only, 1 = fingertip only
     aim_span_x: float = 1.4         # hand travel (sw) that crosses the full screen width
     aim_center_x: float = 0.55      # uncalibrated rest position, sw out from mid-chest on the gun side
-    aim_center_y: float = -0.2      # sw, negative = above the shoulder line
+    aim_center_y: float = 0.05      # sw, negative = above the shoulder line. Live test: hands rest about level with the shoulders
     aim_span_min: float = 0.9       # calibration may not make the gain twitchier than this
     aim_span_max: float = 2.6
     aim_min_cutoff: float = 1.2     # One Euro: lower = steadier at rest
@@ -75,6 +75,8 @@ class Config:
     rewind_margin_s: float = 0.03   # step a little further back than the detected onset
     rewind_max_s: float = 0.35
     trigger_gap_reset_s: float = 0.25
+    fire_hold_radius: float = 1.1   # sw. Other hand this close to the gun wrist = the shot might be a slap
+    fire_hold_s: float = 0.2        # so hold it this long and drop it if a reload arrives
 
     # --- Reload slap ---------------------------------------------------------
     slap_near: float = 0.55         # sw between off-hand palm and gun wrist

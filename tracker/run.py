@@ -30,6 +30,16 @@ class Camera:
     def __init__(self, index, width, height):
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
         self.cap = cv2.VideoCapture(index, backend)
+        if not self.cap.isOpened() and sys.platform == "darwin":
+            # The first attempt makes macOS show its camera prompt, and that attempt always
+            # fails. If we exit now the prompt vanishes with us, so wait for the answer.
+            print("[camera] no access yet. If macOS is asking for camera permission, click Allow (waiting 25s).\n"
+                  "[camera] No prompt? System Settings > Privacy & Security > Camera, turn on the app you launched this from.")
+            deadline = time.monotonic() + 25
+            while not self.cap.isOpened() and time.monotonic() < deadline:
+                time.sleep(2.0)
+                self.cap.release()
+                self.cap = cv2.VideoCapture(index, backend)
         if sys.platform == "win32":
             self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))   # 720p30 needs MJPG on most webcams
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -37,8 +47,9 @@ class Camera:
         self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.cap.isOpened():
-            raise SystemExit(f"could not open camera {index}. Try --camera 1, close other apps using it, "
-                             "and on macOS allow camera access for your terminal in System Settings.")
+            raise SystemExit(f"could not open camera {index}. Try --camera 1 and close other apps using it. On macOS: "
+                             "System Settings > Privacy & Security > Camera, turn on the app you launched this from "
+                             "(Terminal, iTerm, Claude, VS Code...), then run again.")
         self.lock = threading.Condition()
         self.frame = None
         self.seq = 0
