@@ -63,5 +63,5 @@ class OscIn:
 
     def close(self):
         if self.server:
-            self.server.shutdown()
-            self.server.server_close()
+            # shutdown() blocks until the server loop notices. Nothing on exit needs to wait for it.
+            threading.Thread(target=self.server.shutdown, daemon=True).start()

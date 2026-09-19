@@ -57,7 +57,7 @@ webcam -> tracker (Python, MediaPipe landmarks + our signal processing)
 Unreal -> OSC port 7001 -> tracker (calibration, recenter)
 ```
 
-- Tracker is Python, not a browser tab: a background browser tab gets throttled when Unreal has focus. On Windows the tracker runs on CPU, so Unreal keeps the GPU (on a Mac it has to use the GPU).
+- Tracker is Python, not a browser tab: a background browser tab gets throttled when Unreal has focus. The tracker runs on CPU, so Unreal keeps the GPU.
 - Unreal uses the built-in **OSC plugin**. Blueprint only, no C++ needed.
 - The tracker can run on the same machine (`127.0.0.1`) or on a second laptop (`--host <unreal machine ip>`) over a phone hotspot if the Unreal laptop is struggling.
 - **The game is always playable with mouse and keyboard.** `BP_TrackerInput` has a mouse mode. Lohith never needs a camera to build the game.
@@ -99,9 +99,9 @@ Mouse mode mapping (Unreal side and `fake_tracker.py`): mouse = aim, LMB = fire,
 
 ### AKHIL: the tracker (`tracker/`, Python)
 
-**Status: v1 of all of this is in [tracker/](tracker/), see [tracker/README.md](tracker/README.md).** 25 synthetic tests pass, real models verified on sample photos at ~6 ms/frame on the Mac. Not yet done: steps 9 and 10, and every threshold is still a first guess until it is tuned on real hands with the checklist in the README.
+**Status: v1 of all of this is in [tracker/](tracker/), see [tracker/README.md](tracker/README.md).** 27 synthetic tests pass, first live webcam session done, ~24 ms/frame on an M3. Not yet done: steps 9 and 10, and every threshold is still a first guess until it is tuned on real hands with the checklist in the README.
 
-Found on the way: `mediapipe 1.x` crashes on its CPU path on macOS, so the tracker uses the GPU delegate there. Lean and duck come from the shoulders rather than the head, because the gun hand covers the face from the camera's view. The neutral stance is learned the first time the player stands still, so nobody has to stand dead center.
+Found on the way: `mediapipe 1.0.1` is unusable on macOS (CPU path aborts at load, GPU path leaks ~10 MB per frame and dies after a couple of minutes), so `requirements.txt` pins `0.10.21`. Do not upgrade it. Lean and duck come from the shoulders rather than the head, because the gun hand covers the face from the camera's view. The neutral stance is learned the first time the player stands still, so nobody has to stand dead center.
 
 1. **Hour 1, unblocks everyone:** push `fake_tracker.py` (mouse and keys in an OpenCV window, sends the exact OSC above) and `osc_monitor.py` (prints whatever arrives on 7000). Jason builds against the fake.
 2. **Landmarks.** Webcam 1280x720, HandLandmarker (2 hands) + PoseLandmarker lite, debug window with skeleton and FPS. Test standing 4-5 ft back. Target 25+ FPS.

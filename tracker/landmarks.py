@@ -1,6 +1,5 @@
 """Landmark data types, the MediaPipe wrapper, and record/replay of landmark streams."""
 import json
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,10 +64,10 @@ class Landmarker:
     def __init__(self, cfg, num_hands=2, pose_every=1, delegate=None):
         import mediapipe as mp
         self.mp = mp
-        # mediapipe 1.x macOS wheels abort on the CPU path ("Service is unavailable" from
-        # their Metal helper), so macOS runs on the GPU delegate, which wants RGBA input.
-        # Everywhere else the Python GPU delegate does not exist, so CPU + RGB.
-        self.gpu = (delegate or ("gpu" if sys.platform == "darwin" else "cpu")) == "gpu"
+        # CPU everywhere. requirements.txt pins mediapipe 0.10.21 on purpose: on macOS, 1.0.1
+        # aborts at load on the CPU path, and its GPU path leaks ~10 MB per frame until the
+        # process dies a couple of minutes in. The GPU delegate wants RGBA input.
+        self.gpu = delegate == "gpu"
         for name, url in MODEL_URLS.items():
             if not (MODELS_DIR / name).exists():
                 raise SystemExit(f"missing {MODELS_DIR / name}\ndownload it from {url}")

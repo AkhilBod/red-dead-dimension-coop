@@ -106,4 +106,4 @@ Synthetic landmarks, no camera. They check the logic (one shot per pull, aim rew
 | [one_euro.py](one_euro.py) | speed-adaptive low-pass filter |
 | [config.py](config.py) | every threshold, with units |
 
-Note for Macs: `mediapipe 1.x` crashes on its CPU path on macOS, so the tracker uses the GPU delegate there automatically and the CPU everywhere else. `--delegate` overrides it.
+**Do not upgrade mediapipe.** `requirements.txt` pins `0.10.21` on purpose. On macOS, `1.0.1` aborts at load on the CPU path, and its GPU path leaks about 10 MB per frame until the process dies a couple of minutes in (this killed a live test). `0.10.21` on CPU holds ~24 ms per frame at a flat ~300 MB on an M3.

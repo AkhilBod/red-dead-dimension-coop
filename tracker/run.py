@@ -139,7 +139,7 @@ def main():
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--pose-every", type=int, default=1, help="run the body model every Nth frame (2 saves CPU)")
-    ap.add_argument("--delegate", choices=("cpu", "gpu"), help="default: gpu on macOS, cpu elsewhere")
+    ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
     ap.add_argument("--no-window", action="store_true")
     ap.add_argument("--frames", type=int, default=0, help="stop after this many frames (0 = run until Q)")
     ap.add_argument("--record", nargs="?", const="auto", help="write landmarks to a .jsonl file")
