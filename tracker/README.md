@@ -33,8 +33,8 @@ Stand 4 to 5 ft back with your shoulders in frame. Light your face and hands.
 |---|---|
 | `--host 10.0.0.5` | Unreal is on another machine |
 | `--camera 1` | pick another webcam |
-| `--pose-every 2` | body model every 2nd frame, for slow laptops |
-| `--no-window` | no preview, slightly faster |
+| `--no-window` | no tuning window. **Run the demo machine like this** |
+| `--pose-every 2` | cap the body model at every 2nd frame (it already backs off by itself on a busy machine) |
 | `--record` | save landmarks to `recordings/` |
 | `--replay file.jsonl` | run the detectors over a recording, no camera |
 | `--set key=value` | override anything in [config.py](config.py), repeatable |
@@ -75,7 +75,7 @@ Jason's original [switch_led_buzz.ino](../arduino/switch_led_buzz/switch_led_buz
 
 ## First session checklist
 
-1. 25+ fps in the corner. If not: `--pose-every 2`, close other apps.
+1. The fps number top-left is white at 25+, yellow under 25, red under 20. It should sit at the camera's 30. Under 20 nothing else on this list means anything: close other apps.
 2. Raise your finger gun pointing at the middle of the screen. TRACK and AIM light up and the crosshair appears **in the middle**, wherever your hand is. Pivot to point at each corner: the crosshair should travel about as far as your finger points. Not far enough: **]**. Too far or too shaky: **[**. It prints the value, keep it with `--set aim_gain=...`. Drifted: **X**.
 3. Fire 20 thumb shots at one spot: pop the thumb up, drop it. Want 18+ to register, none while just aiming. Missing shots: lower `thumb_drop_frac`. Firing by itself: raise it.
 4. Fire 10 recoil shots: kick the fingertip up. Small kicks not registering: lower `flick_rise_m` (0.04). It costs false shots when you re-aim upward fast, which is why it is 0.05.
@@ -121,16 +121,34 @@ Synthetic landmarks, no camera. They check the logic (one shot per pull, aim rew
 
 | File | Job |
 |---|---|
-| [landmarks.py](landmarks.py) | MediaPipe hand + body models on two threads, record/replay |
+| [landmarks.py](landmarks.py) | MediaPipe hand + body models on two threads, the cheap second-hand search, record/replay |
 | [hand_features.py](hand_features.py) | the hand's image scale (how we get real centimetres), open palm, thumb feature |
 | [body.py](body.py) | chest depth from shoulder width, chest anchor, lean, duck, stance baseline |
 | [aim.py](aim.py) | fingertip position relative to the chest -> screen: geometric gain, learned centre, edge push, calibration, aim history |
 | [trigger.py](trigger.py) | thumb drop and recoil kick, each reporting when the gesture *began* |
 | [reload.py](reload.py) | a kick while the hands are together is a reload, a kick with them apart is a shot |
 | [glove.py](glove.py) | serial link to the Arduino glove: trigger presses in, buzzer/LED codes out, reconnects by itself |
+| [run.py](run.py) | camera thread, tracker thread, window on the main thread, OSC, glove, keys |
 | [pipeline.py](pipeline.py) | ties it together, no camera or network inside so it can be tested |
 | [one_euro.py](one_euro.py), [windows.py](windows.py) | speed-adaptive low-pass filter, time-windowed medians and percentiles |
 | [config.py](config.py) | every threshold, with units |
+
+## Frame rate
+
+Every time-based rule in the detectors assumes about 30 frames a second, so this matters more than any threshold. Measured on a busy M3 Air, per frame:
+
+| | before | now |
+|---|---|---|
+| Hand model with one hand in view | 35 ms | **15 ms** |
+| Waiting on the body model | up to 25 ms | 0 to 4 ms |
+| Showing the tuning window | 14 ms, blocking | 0 (own thread) |
+| **Tracker frame rate, window open** | **13.6 fps** | **30 fps** (camera limit), ~25 ms camera to OSC |
+
+What changed:
+- Asked for 2 hands while 1 is in view, MediaPipe re-runs its expensive palm *search* on every frame looking for the other. Now a 1-hand model runs normally and a 2-hand model takes a look every 8 frames, taking over only while two hands are really there. A second hand is still picked up within about a quarter second.
+- The body model never holds a frame up. If it has not finished, the frame goes out with the newest body available.
+- The tracker runs on its own thread. The window (which macOS forces onto the main thread) draws whatever is newest and cannot slow the game's input down.
+- The GPU delegate was tested again on the pinned MediaPipe: 9 ms a frame, but it still leaks (236 MB to 1.5 GB in 240 frames), so it stays off.
 
 ## What the first recorded session taught us
 

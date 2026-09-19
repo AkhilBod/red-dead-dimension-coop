@@ -2,11 +2,12 @@
 
     python run.py                          # camera 0, send to Unreal on this machine
     python run.py --host 10.0.0.5          # Unreal runs on another machine
-    python run.py --camera 1 --pose-every 2
+    python run.py --no-window              # no tuning window: what the demo machine should run
     python run.py --record                 # save landmarks to recordings/ for offline tuning
-    python run.py --replay recordings/x.jsonl --set thumb_fire_frac=0.55
+    python run.py --replay recordings/x.jsonl --set thumb_drop_frac=0.35
 """
 import argparse
+import queue
 import sys
 import threading
 import time
@@ -16,7 +17,7 @@ import cv2
 
 import protocol as P
 from config import Config
-from debug_view import DebugView
+from debug_view import DebugView, capture
 from glove import FIRE, RELOAD, Glove
 from landmarks import Landmarker, frame_from_json, frame_to_json
 from osc_io import OscIn, OscOut
@@ -104,33 +105,170 @@ class LocalCalibration:
             print("[calib] done")
 
 
-def replay_frames(path, realtime):
-    start_wall, start_t = time.monotonic(), None
-    with open(path) as f:
-        for line in f:
-            frame = frame_from_json(line)
-            if start_t is None:
-                start_t = frame.t
-            if realtime:
-                time.sleep(max(0.0, (frame.t - start_t) - (time.monotonic() - start_wall)))
-            yield None, frame
+class Tracker(threading.Thread):
+    """Camera -> landmarks -> pipeline -> OSC and glove, as fast as frames arrive.
 
+    On its own thread because showing a window costs 10-25 ms a frame and must happen on the
+    main thread on macOS. Measured live, that alone pulled the tracker from 30 to under 20 fps.
+    Now the window draws whatever the newest result is, whenever it gets round to it, and the
+    game's input does not care. Keys reach the pipeline through a queue for the same reason.
+    """
 
-def camera_frames(args, cfg):
-    camera = Camera(args.camera, args.width, args.height)
-    landmarker = Landmarker(cfg, pose_every=args.pose_every, delegate=args.delegate)
-    seq = 0
-    try:
-        while True:
-            bgr, t, seq = camera.read(seq)
-            if bgr is None:
-                print("[camera] no frames arriving")
-                continue
-            bgr = cv2.flip(bgr, 1)          # mirror: move right, crosshair goes right
-            yield bgr, landmarker.process(bgr, t)
-    finally:
-        camera.close()
-        landmarker.close()
+    def __init__(self, args, cfg, camera):
+        super().__init__(daemon=True)
+        self.args, self.cfg, self.camera = args, cfg, camera
+        self.pipeline = Pipeline(cfg)
+        self.out = OscOut(args.host, args.port)
+        self.osc_in = OscIn(args.in_port)
+        self.glove = None if (args.arduino == "off" or args.replay) else Glove(args.arduino)
+        self.calib = LocalCalibration()
+        self.keys = queue.SimpleQueue()
+        self.stop_flag = threading.Event()
+        self.want_view = not args.no_window
+        self.recorder = None
+        self.fps = 0.0
+        self.ms = 0.0
+        self._lock = threading.Lock()
+        self._latest = None
+        self._events = []
+        self.counts = {"frames": 0, "fire": 0, "reload": 0, "hands": 0, "body": 0}
+
+    # ---- called from the window's thread ----
+
+    def newest(self):
+        """(frame image, view model, events since last asked) or None if nothing new."""
+        with self._lock:
+            if self._latest is None:
+                return None
+            (bgr, model), self._latest = self._latest, None
+            events, self._events = self._events, []
+            return bgr, model, events
+
+    # ---- tracker thread ----
+
+    def _frames(self):
+        if self.args.replay:
+            start_wall, start_t = time.monotonic(), None
+            with open(self.args.replay) as f:
+                for line in f:
+                    frame = frame_from_json(line)
+                    if start_t is None:
+                        start_t = frame.t
+                    if self.args.realtime:
+                        time.sleep(max(0.0, (frame.t - start_t) - (time.monotonic() - start_wall)))
+                    yield None, frame
+            return
+        landmarker = Landmarker(self.cfg, pose_every=self.args.pose_every, delegate=self.args.delegate)
+        seq = 0
+        try:
+            while not self.stop_flag.is_set():
+                bgr, t, seq = self.camera.read(seq)
+                if bgr is None:
+                    print("[camera] no frames arriving")
+                    continue
+                bgr = cv2.flip(bgr, 1)          # mirror: move right, crosshair goes right
+                yield bgr, landmarker.process(bgr, t)
+        finally:
+            landmarker.close()
+
+    def _record(self, path=None):
+        if self.recorder:
+            self.recorder.close()
+            self.recorder = None
+            print("[record] stopped")
+            return
+        if path in (None, "auto"):
+            Path("recordings").mkdir(exist_ok=True)
+            path = f"recordings/{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+        self.recorder = open(path, "w")
+        print(f"[record] writing {path}")
+
+    def _handle_key(self, key):
+        cfg, pipeline = self.cfg, self.pipeline
+        if key == "c":
+            self.calib.start(pipeline)
+        elif key == "n":
+            pipeline.body.recenter()
+        elif key == "x":
+            pipeline.recenter_aim = True
+        elif key in "[]":
+            cfg.aim_gain = round(max(0.2, min(3.0, cfg.aim_gain * (1.15 if key == "]" else 1 / 1.15))), 3)
+            print(f"[tracker] aim_gain = {cfg.aim_gain}   (keep it with: --set aim_gain={cfg.aim_gain})")
+        elif key == "f":
+            cfg.flick_enabled = not cfg.flick_enabled
+            print(f"[tracker] recoil trigger {'on' if cfg.flick_enabled else 'off'}")
+        elif key == "r" and not self.args.replay:
+            self._record()
+
+    def run(self):
+        args, pipeline, glove = self.args, self.pipeline, self.glove
+        print(f"[tracker] sending to {args.host}:{args.port}, listening on {args.in_port}")
+        if args.record and not args.replay:
+            self._record(args.record)
+        last_wall, low_fps_warned = time.monotonic(), -1e9
+        try:
+            for bgr, frame in self._frames():
+                work_start = time.monotonic()
+                while True:
+                    try:
+                        self._handle_key(self.keys.get_nowait())
+                    except queue.Empty:
+                        break
+                for address, cmd_args in self.osc_in.poll():
+                    print(f"[osc in] {address} {cmd_args}")
+                    pipeline.handle_command(address, cmd_args)
+                if glove:
+                    for t_press in glove.poll():
+                        pipeline.press_button(t_press)
+                state, events = pipeline.update(frame)
+                self.calib.update(pipeline)
+                self.out.state(state)
+                for e in events:
+                    if e[0] == "fire":
+                        self.out.fire(e[1], e[2])
+                        print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})  {e[3]}")
+                        if glove and e[3] != "button":
+                            glove.send(FIRE)        # the switch already buzzed by itself
+                    else:
+                        self.out.reload()
+                        print(f"[{frame.t:9.2f}] RELOAD")
+                        if glove:
+                            glove.send(RELOAD)
+                    self.counts[e[0]] += 1
+                if self.recorder:
+                    self.recorder.write(frame_to_json(frame) + "\n")
+
+                c = self.counts
+                c["frames"] += 1
+                c["hands"] += bool(frame.hands)
+                c["body"] += pipeline.body.visible
+                now = time.monotonic()
+                self.fps += (1.0 / max(1e-3, now - last_wall) - self.fps) * 0.1
+                last_wall = now
+                # Camera frame to OSC packet. In a replay there is no camera, so it is just our own work.
+                self.ms = (now - frame.t) * 1000 if not args.replay else (now - work_start) * 1000
+
+                # Every time-based rule in the detectors assumes ~30 frames a second.
+                if not args.replay and c["frames"] > 90 and self.fps < LOW_FPS and now - low_fps_warned > 30.0:
+                    low_fps_warned = now
+                    print(f"[tracker] LOW FRAME RATE: {self.fps:.0f} fps. Below {LOW_FPS} the triggers and aim get unreliable. Close other apps.")
+
+                if self.want_view:
+                    model = capture(pipeline, frame, state)
+                    with self._lock:
+                        self._latest = (bgr, model)
+                        self._events += events
+                if args.frames and c["frames"] >= args.frames:
+                    break
+        finally:
+            if self.recorder:
+                self.recorder.close()
+            if glove:
+                glove.close()
+            self.osc_in.close()
+            c, n = self.counts, max(1, self.counts["frames"])
+            print(f"[tracker] {c['frames']} frames, {self.fps:.1f} fps, hands in {100 * c['hands'] // n}% of frames, "
+                  f"body in {100 * c['body'] // n}%, {c['fire']} shots, {c['reload']} reloads")
 
 
 def main():
@@ -141,10 +279,10 @@ def main():
     ap.add_argument("--camera", type=int, default=0)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
-    ap.add_argument("--pose-every", type=int, default=1, help="run the body model every Nth frame (2 saves CPU)")
+    ap.add_argument("--pose-every", type=int, default=1, help="run the body model at most every Nth frame")
     ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
     ap.add_argument("--arduino", default="auto", help="glove serial port, e.g. /dev/cu.usbmodem1101 or COM5. auto = find it, off = no glove")
-    ap.add_argument("--no-window", action="store_true")
+    ap.add_argument("--no-window", action="store_true", help="no tuning window. Use this on the demo machine")
     ap.add_argument("--windowed", action="store_true", help="tuning window not fullscreen (W toggles)")
     ap.add_argument("--frames", type=int, default=0, help="stop after this many frames (0 = run until Q)")
     ap.add_argument("--record", nargs="?", const="auto", help="write landmarks to a .jsonl file")
@@ -155,127 +293,47 @@ def main():
 
     cfg = Config()
     cfg.apply_overrides(args.set)
-    pipeline = Pipeline(cfg)
-    out = OscOut(args.host, args.port)
-    osc_in = OscIn(args.in_port)
-    view = None if args.no_window else DebugView()
-    fullscreen = not args.windowed
-    if view:
-        # Fullscreen by default: the crosshair is mapped to the whole screen, like the game's will be.
-        # In a small window it would travel less than your finger points and feel wrong.
-        cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
-        if fullscreen:
-            cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    calib = LocalCalibration()
-    glove = None if (args.arduino == "off" or args.replay) else Glove(args.arduino)
-    print(f"[tracker] sending to {args.host}:{args.port}, listening on {args.in_port}")
+    # The camera is opened here, on the main thread: macOS can only show its permission prompt from it.
+    camera = None if args.replay else Camera(args.camera, args.width, args.height)
+    tracker = Tracker(args, cfg, camera)
+    tracker.start()
 
-    recorder = None
-
-    def start_recording(path=None):
-        nonlocal recorder
-        if path in (None, "auto"):
-            Path("recordings").mkdir(exist_ok=True)
-            path = f"recordings/{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
-        recorder = open(path, "w")
-        print(f"[record] writing {path}")
-
-    if args.record and not args.replay:
-        start_recording(args.record)
-
-    source = replay_frames(args.replay, args.realtime) if args.replay else camera_frames(args, cfg)
-    counts = {"frames": 0, "fire": 0, "reload": 0, "hands": 0, "body": 0}
-    fps, last_wall = 0.0, time.monotonic()
-    low_fps_warned, pending_events = 0.0, []
     try:
-        for bgr, frame in source:
-            work_start = time.monotonic()
-            for address, cmd_args in osc_in.poll():
-                print(f"[osc in] {address} {cmd_args}")
-                pipeline.handle_command(address, cmd_args)
-            if glove:
-                for t_press in glove.poll():
-                    pipeline.press_button(t_press)
-            state, events = pipeline.update(frame)
-            calib.update(pipeline)
-            out.state(state)
-            for e in events:
-                if e[0] == "fire":
-                    out.fire(e[1], e[2])
-                    print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})  {e[3]}")
-                    if glove and e[3] != "button":
-                        glove.send(FIRE)        # the switch already buzzed by itself
-                else:
-                    out.reload()
-                    print(f"[{frame.t:9.2f}] RELOAD")
-                    if glove:
-                        glove.send(RELOAD)
-                counts[e[0]] += 1
-            if recorder:
-                recorder.write(frame_to_json(frame) + "\n")
-
-            counts["frames"] += 1
-            counts["hands"] += bool(frame.hands)
-            counts["body"] += pipeline.body.visible
-            now = time.monotonic()
-            fps += (1.0 / max(1e-3, now - last_wall) - fps) * 0.1
-            last_wall = now
-            # Landmarks were computed before this loop body ran, so add their age for the true per-frame cost.
-            ms = (now - frame.t) * 1000 if not args.replay else (now - work_start) * 1000
-
-            # Every time-based rule in the detectors assumes ~30 frames a second. Seen live: on a
-            # machine deep in swap the tracker fell to 3 fps and nothing it did meant anything.
-            if counts["frames"] > 60 and fps < LOW_FPS and now - low_fps_warned > 5.0:
-                low_fps_warned = now
-                print(f"[tracker] LOW FRAME RATE: {fps:.0f} fps. Triggers and aim are unreliable below {LOW_FPS}. "
-                      "Close other apps, or try --pose-every 2 / --no-window.")
-            pending_events += events
-            # Drawing the window is the one cost we can shed: when frames are slow, draw fewer of them.
-            draw_every = 1 if fps >= 26 else 2 if fps >= LOW_FPS else 3
-            if view and counts["frames"] % draw_every == 0:
-                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, pending_events, fps, ms, recorder is not None, low_fps=fps < LOW_FPS and counts["frames"] > 60, glove=glove.status if glove else "glove off"))
-                pending_events = []
-                key = cv2.waitKey(1) & 0xFF
+        if args.no_window:
+            while tracker.is_alive():
+                tracker.join(timeout=0.2)
+        else:
+            view = DebugView()
+            fullscreen = not args.windowed
+            # Fullscreen by default: the crosshair is mapped to the whole screen, like the game's will be.
+            # In a small window it would travel less than your finger points and feel wrong.
+            cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+            if fullscreen:
+                cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            while tracker.is_alive():
+                got = tracker.newest()
+                if got is not None:
+                    bgr, model, events = got
+                    low = tracker.fps < LOW_FPS and tracker.counts["frames"] > 90 and not args.replay
+                    cv2.imshow(WINDOW, view.draw(bgr, model, events, tracker.fps, tracker.ms, tracker.recorder is not None, low,
+                                                 tracker.glove.status if tracker.glove else "glove off"))
+                key = cv2.waitKey(1 if got is not None else 5) & 0xFF
                 if key in (ord("q"), 27):
                     break
-                elif key == ord("c"):
-                    calib.start(pipeline)
-                elif key == ord("n"):
-                    pipeline.body.recenter()
-                elif key == ord("x"):
-                    pipeline.recenter_aim = True
-                elif key in (ord("["), ord("]")):
-                    cfg.aim_gain = round(max(0.2, min(3.0, cfg.aim_gain * (1.15 if key == ord("]") else 1 / 1.15))), 3)
-                    print(f"[tracker] aim_gain = {cfg.aim_gain}   (keep it with: --set aim_gain={cfg.aim_gain})")
-                elif key == ord("w"):
+                if key == ord("w"):
                     fullscreen = not fullscreen
                     cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN if fullscreen else cv2.WINDOW_NORMAL)
-                elif key == ord("f"):
-                    cfg.flick_enabled = not cfg.flick_enabled
-                    print(f"[tracker] flick trigger {'on' if cfg.flick_enabled else 'off'}")
-                elif key == ord("r") and not args.replay:
-                    if recorder:
-                        recorder.close()
-                        recorder = None
-                        print("[record] stopped")
-                    else:
-                        start_recording()
-            if args.frames and counts["frames"] >= args.frames:
-                break
+                elif key != 255 and chr(key) in "cnx[]fr":
+                    tracker.keys.put(chr(key))
     except KeyboardInterrupt:
         pass
     finally:
-        source.close()          # releases the camera and the models
-        if glove:
-            glove.close()
-        if recorder:
-            recorder.close()
-        osc_in.close()
-        if view:
+        tracker.stop_flag.set()
+        tracker.join(timeout=3.0)
+        if camera:
+            camera.close()
+        if not args.no_window:
             cv2.destroyAllWindows()
-    n = max(1, counts["frames"])
-    print(f"[tracker] {counts['frames']} frames, {fps:.1f} fps, hands in {100 * counts['hands'] // n}% of frames, "
-          f"body in {100 * counts['body'] // n}%, {counts['fire']} shots, {counts['reload']} reloads")
 
 
 if __name__ == "__main__":

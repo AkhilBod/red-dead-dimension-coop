@@ -20,6 +20,8 @@ class Config:
     hand_track_conf: float = 0.5
     pose_detect_conf: float = 0.5
     pose_track_conf: float = 0.5
+    second_hand_scan_every: int = 8      # frames between looks for a second hand while only one is tracked (~4 a second)
+    pose_wait_s: float = 0.004           # how long a frame will wait for the body model before going on without it
 
     # --- Which detections are really the player's hands ------------------------
     # [rec] A background object was reported as a 0.99-confidence hand a third the size
