@@ -1,118 +1,140 @@
-# High Noon: first-person finger-gun duel over LAN
+# High Noon: first-person finger-gun duel over LAN (camera only, no hardware)
 
 ## Context
 
 SteelHacks project targeting three tracks at once: No Wrapper (no LLM, something hard and explainable), Press Start (one mechanic, playable with zero explanation), Cold Start (beginner, learning story).
-Idea: two players, two laptops, each sees the other in first person 20 ft away on a western street. Your hand is the gun. Your body is the dodge. A minimal glove adds only what a camera cannot: an instant trigger and physical recoil.
-Directory `/Users/akhil/Desktop/fingerGUn` is empty. Greenfield.
+Two players, two laptops, each sees the other in first person 20 ft away on a western street. Your hand is the gun. Your body is the dodge. **No hardware: a webcam is the only sensor.** Any two laptops with Chrome can play.
+Repo: https://github.com/AkhilBod/fingerGunGame (only `PLAN.md` so far). Team of 4.
 
-Design rule (keeps it from becoming "a controller"): **one input on the glove, the trigger switch. Everything else is your body.** No joystick, no menu buttons.
+## Trigger without a button (the new hard problem)
 
-## Game design
+However you pretend to shoot, it shoots:
+- **Thumb drop** (hammer falls). Thumb-tip to index-PIP distance, normalized by palm size. Fires on a fast drop below a low threshold, re-arms above a high threshold (hysteresis).
+- **Recoil flick** (hand kicks up and returns within ~200ms). Gross motion, so it still works when the hand is small in frame.
+- Either one fires. Shared ~250ms cooldown.
+- **Aim rewind:** both gestures move the fingertip, so the shot uses the aim from the moment the gesture *started* (ring buffer of aim history), not where the finger ended up. This is what makes camera-only shooting feel accurate.
+- Feedback replaces haptics: camera kick, muzzle flash, loud synthesized shot, flash in the AR mirror inset.
+- Reload = finger pointed at the sky, held ~300ms (sustained, so it never collides with the flick).
+- Stretch/fun mode: shout "BANG" to fire (mic onset detection, only while gun pose is held).
 
-**Flow (under 30s to first shot, no text instructions needed)**
-1. "MAKE A FINGER GUN" with a hand silhouette. Pose detected, crosshair appears.
-2. Calibrate = tutorial: shoot 4 bottles in the screen corners. Also joins the lobby.
-3. "HOLSTER" (drop hand to hip). Both holstered, wind, silence, random 2-5s, bell.
-4. Draw, shoot, dodge. One body hit wins the round. Best of 3. Draw time shown in ms.
+## MVP
 
-**Mechanics**
-- Aim: index fingertip position *relative to your head*, so leaning to dodge does not drag your aim.
-- Trigger: thumb presses micro switch on the side of the middle finger (the natural "hammer drop" motion). Fallback with no glove: thumb-drop gesture, or spacebar.
-- Dodge: lean/sidestep moves your avatar (amplified ~2.5x). Your first-person camera shifts with your head (parallax window effect), so dodging feels physical.
-- Duck: drop behind your barrel. Safe, but you cannot shoot. Barrel splinters after 3 hits (stops turtling).
-- Bullets are visible tracers, ~0.5s travel over 20 ft. Dodgeable but hard. Whiz audio panned L/R on near miss.
-- Steady hands shoot straight: crosshair bloom grows with body speed. Move to live, stand still to hit.
-- Six shots. Reload by pointing the gun at the sky.
-- Drawing before the bell = foul, gun jams 1s.
-- Opponent is a paper-puppet cowboy driven by their live pose landmarks. You read your friend's real body language. Only landmarks cross the network, no video.
-- Solo bot bandit (random reaction 350-600ms, aim error, same bullet rules) so one judge can play alone. Also the dev test harness.
-- AR mirror inset: small view of your own webcam with muzzle flash on your fingertip and a hat on your head.
+One laptop. Gray boxes for art. A box bandit that shoots back. You can dodge.
 
-**Staging:** laptops back to back on a table so players physically face each other, each ~5 ft from their own screen. Works equally with laptops 20 ft apart. No code difference.
+**Hour 0, Akhil alone, push before anyone else codes:** skeleton repo.
+- Vite + TS single root package, Three.js, `npm run dev` works.
+- `InputSource` interface: `aim {x,y}|null`, `gunPose`, `holstered`, `lean -1..1`, `duck 0..1`, `bodySpeed`, `landmarks`, `onFire`, `onReload`.
+- `MouseInput` implementation: mouse aim, click fire, A/D lean, S duck, H holster, R reload. Enabled by `?debug=mouse`.
+- `OpponentSource` interface (lean, duck, landmarks, shots). Stub that stands still.
+- Asset manifest with fixed filenames. Missing file = colored placeholder plane.
+- `src/tuning.ts` holding every gameplay constant (bullet speed, dodge gain, bot reaction, bloom).
 
-## Hardware (per glove, need two)
+After that push, all four people work in parallel against those seams.
 
-From the hardware table list:
-- Arduino (Uno-class) strapped to forearm, USB to laptop. Need a ~3m USB cable or extension.
-- Micro Switch = trigger.
-- Servo Motor = "hammer" on the back of the hand. Snaps on fire. Tactile kick and visible to spectators. No motor driver needed.
-- Buzzer = click on fire, rattle when hit.
-- LED on fingertip if the table has any (220 ohm resistor). Muzzle flash.
-- Stretch only: 3-Axis Accelerometer for ms-accurate draw detection via gravity vector.
+Milestones to a playable MVP:
+- **M1** `CameraInput`: webcam 1280x720, HandLandmarker + PoseLandmarker lite, debug overlay, FPS. Spike at 4-5 ft: is fingertip aim stable, does thumb drop register. If not, aim falls back to pose wrist relative to shoulder and the flick becomes the main trigger.
+- **M2** Head-relative aim + One Euro + crosshair + 4-bottle calibration + both trigger gestures + aim rewind.
+- **M3** Duel loop vs bot on the gray-box street (built in parallel by P2 on `MouseInput`), then swap in `CameraInput`.
 
-Serial protocol, 115200 baud. Glove to PC: `T` on debounced press. PC to glove: `F` fire (servo + buzzer + LED), `H` hit taken (long buzz), `N` near miss (tick). Non-blocking servo timing with `millis()`.
+## Team split (4 people, no hardware)
 
-If only one Arduino is available, player two uses the thumb-drop gesture trigger.
+Each person owns their folders. Merge to `main` every couple of hours.
+
+| Who | Owns | First task after skeleton | Done when |
+|---|---|---|---|
+| **P1 Akhil: camera input** | `src/tracking/`, `src/main.ts` | M1 spike at real standing distance | Aim, both triggers, holster, reload, lean, duck all work from the webcam |
+| **P2: game rules + bot** | `src/game/`, `src/tuning.ts` | Duel state machine in `?debug=mouse`: holster, random wait, bell, foul, result | Full best-of-3 vs bot with bullets, dodge, ammo, reload, bloom, barrel |
+| **P3: art + audio + feel** | `public/assets/`, `src/render/`, `src/audio/` | One style frame (street + cowboy), then the asset list | Every placeholder replaced, puppet rigged, SFX, shake, slow-mo, AR mirror inset |
+| **P4: networking, then demo** | `server/`, `src/net/` | `ws` relay echoing between two tabs | Two laptops duel. Then stranger playtests, tuning, Devpost, pitch, backup video |
+
+If someone does not code:
+- P2 not coding: Akhil builds M3 after M2. P2 owns `tuning.ts` numbers, bot difficulty, and playtesting.
+- P3 not coding: P3 stays purely on assets. Akhil or P4 wires `src/render/`.
+- P4 not coding: Akhil takes networking after M3. P4 goes straight to playtests, Devpost, pitch, video, and helps P3 with assets.
+
+Worst case (only Akhil codes), order is: skeleton, M1, M2, M3, network, juice. Two people on art (scene vs characters/HUD), one on playtest and submission.
+
+**Timeline (24h)**
+- H0-1: Skeleton pushed. Others install Node + Chrome, clone, run it, P3 starts the style frame.
+- H1-8: M1, M2 (P1). Duel loop vs bot in mouse mode (P2). First asset pass (P3). Clock sync + state relay in two tabs (P4).
+- H8-14: Integrate. Camera input into the duel, assets into the scene, network opponent replaces bot.
+- H14-20: Duck + barrel, bloom, AR inset, puppet polish, juice, stranger playtests.
+- H20-24: Feature freeze. Bugs, demo rehearsal, Devpost, backup video.
+
+Cut order if behind: barrel/duck, AR inset, BANG mode. Never cut the bot or mouse debug.
+
+## Bring
+
+2 laptops with webcams, Chrome or Edge. Boxes to raise screens to chest height. A desk lamp (tracking needs light). Phone hotspot as network fallback. Nothing from the hardware table.
+
+## Asset list for P3 (PNG, transparent, exact filenames)
+
+Style: paper cutout. Thick outline, flat colors, white sticker border. Drawing on paper, photographing, and removing the background is fastest and counts as own art.
+
+- Scene: `bg_sky` 2048x1024, `ground` 1024 tile, `building_l1..l3`, `building_r1..r3` ~1024 tall, `barrel`, `barrel_broken`, `bottle`, `bottle_broken`, `tumbleweed`
+- Puppet, one PNG per part, joint at the top edge: `p_head`, `p_hat` (separate, it flies off), `p_torso`, `p_upperarm`, `p_forearm`, `p_hand_gun`, `p_thigh`, `p_shin`
+- HUD/FX: `crosshair`, `bullet_icon`, `title_logo`, `hand_silhouette`, `draw_banner`, `foul_banner`, `win`, `lose`, `muzzle_flash`, `smoke_puff`, `hat_inset`
+- Audio is synthesized in Web Audio (gunshot, bell, whiz, wind). Optional: one music loop, credited
+
+## Full game design (post-MVP target)
+
+- Flow: "MAKE A FINGER GUN" silhouette, shoot 4 bottles (calibration = tutorial = lobby join), "HOLSTER", bell, duel. One body hit wins the round. Best of 3. Under 30s to first shot.
+- Aim is fingertip relative to head, so dodging does not drag aim.
+- Lean/sidestep dodges (amplified ~2.5x), camera moves with your head. Duck behind barrel: safe, cannot shoot, barrel breaks after 3 hits.
+- Tracer bullets, ~0.5s travel over 20 ft. Whiz panned L/R on near miss.
+- Crosshair bloom grows with body speed. Six shots. Early draw = 1s jam.
+- Opponent is a paper puppet driven by their live pose landmarks (~20Hz, no video).
+- AR mirror inset: your webcam with muzzle flash on the fingertip and a hat.
+- Staging: laptops back to back so players face each other, or 20 ft apart. No code difference.
 
 ## Tech
 
-Browser. Vite + TypeScript, Three.js (flat planes in 3D, paper-diorama look), `@mediapipe/tasks-vision` (HandLandmarker numHands 1 + PoseLandmarker lite, VIDEO mode, 1280x720), Web Serial, Web Audio (synthesized gunshot/bell/whiz, no asset files), `ws` relay server run with `tsx`.
-Model `.task` files and wasm bundled in `public/models/` so venue WiFi is irrelevant.
+Vite + TypeScript, Three.js, `@mediapipe/tasks-vision` (models + wasm bundled in `public/models/`), Web Audio, `ws` relay run with `tsx`.
 
 ```
-client/src/
-  main.ts                 app state machine: title, calibrate, lobby, duel, result
-  tracking/tracker.ts     camera + MediaPipe loop (hands every frame, pose alternate frames if slow)
-  tracking/oneEuro.ts     One Euro filter
-  tracking/aim.ts         head-relative aim, 4-point calibration, aim ring buffer (rewind ~60ms on fire)
-  tracking/gestures.ts    finger-gun pose, holster line, point-up reload, thumb-drop fallback
-  tracking/body.ts        lean, duck, body speed -> bloom
-  hw/glove.ts             Web Serial in/out, auto-reconnect via getPorts()
-  net/protocol.ts         message types (shared with server)
-  net/client.ts           WebSocket, clock sync
-  game/duel.ts            round state machine
-  game/bullets.ts         bullet sim, defender-side hit test
-  game/bot.ts             solo bandit
-  render/scene.ts         street, barrel, head-coupled camera, shake, slow-mo on final hit
-  render/puppet.ts        opponent puppet from remote landmarks
-  render/hud.ts           crosshair+bloom, ammo, round pips, AR mirror inset
-  audio/sfx.ts            synthesized SFX
-server/relay.ts           rooms of 2, clock-sync pings, schedules bell at a future server timestamp, scores
-firmware/glove/glove.ino
+src/main.ts                 app state machine
+src/tuning.ts               all gameplay constants
+src/input/                  InputSource.ts, MouseInput.ts
+src/tracking/               CameraInput.ts, tracker.ts, oneEuro.ts, aim.ts, trigger.ts, gestures.ts, body.ts
+src/game/                   duel.ts, bullets.ts, bot.ts, OpponentSource.ts
+src/net/                    protocol.ts, client.ts (clock sync), NetOpponent.ts
+src/render/                 scene.ts, puppet.ts, hud.ts, mirror.ts, assets.ts (manifest + placeholders)
+src/audio/sfx.ts
+server/relay.ts             rooms of 2, clock pings, bell scheduled at future server time, scores
 ```
 
-**Networking rules**
-- Each laptop runs the client on its own `localhost` (camera and Web Serial need a secure context; `http://192.168.x.x` is not one). Only the WebSocket points at the host IP: `localhost:5173?host=<ip>`.
-- Clock sync: NTP-style offset from ping round trips. Bell is scheduled at a server time ~1s ahead so both screens ring together.
-- Hits are defender-authoritative: shooter sends `{tFire, origin, dir}`, defender simulates the bullet against their own current body. If you saw yourself dodge, you dodged.
-- Pose landmarks sent at ~20Hz, interpolated on the other side.
-- Venue WiFi may block peer traffic. Fallback: phone hotspot. Relay URL is a query param so a cloud relay can be swapped in.
+Networking rules:
+- Each laptop runs the client on its own `localhost` (camera needs a secure context). Only the WebSocket points at the host: `localhost:5173?host=<ip>`.
+- NTP-style clock offset. Bell scheduled ~1s ahead in server time.
+- Defender-authoritative hits: shooter sends `{tFire, origin, dir}`, defender simulates against their own body.
+- Venue WiFi may block peers. Fallback: phone hotspot. Relay URL is a query param.
 
-## Build order (each step is playable)
+## No Wrapper talking points
 
-0. **Spike, first 1-2h:** hand + pose tracking together at 5 ft. Measure FPS and fingertip stability. If hand landmarks are too weak at distance, aim falls back to pose wrist relative to shoulder. Decide here.
-1. Aim + crosshair + One Euro + calibration, shooting bottles. Debug mode `?debug=mouse` (mouse aim, click fire, A/D lean, S duck) for fast iteration.
-2. Glove v1: switch to `T`, `F` back to servo/buzzer. Aim rewind on fire.
-3. Duel vs bot: holster, bell, foul, bullets, lean, duck, barrel, bloom, reload.
-4. Relay server, clock sync, remote puppet, defender-side hits. Test with two windows on one machine, one in mouse debug.
-5. Juice: SFX, shake, slow-mo final hit, result screen with draw ms, AR inset.
-6. Second glove, staging rehearsal, fallbacks verified.
+1. A camera-only trigger that feels instant: normalized landmark features, hysteresis + velocity thresholds, two gestures fused, aim rewound to gesture onset to cancel flinch.
+2. Head-relative aim + One Euro filter + calibration: dodge and aim decouple.
+3. Fair network duel: clock sync, synchronized bell, defender-side hits with bullet travel.
+4. Pose retargeted to a puppet at ~1KB/frame instead of video.
 
-Cut line if behind: drop barrel/duck first, then AR inset, then second glove. Never cut the bot or mouse debug.
+Be upfront that MediaPipe landmark models are off-the-shelf neural nets, not language models. Confirm with an organizer.
 
-## What to tell No Wrapper judges (the hard parts)
+## Check before committing to tracks
 
-1. Head-relative aim mapping + One Euro filter + calibration, so dodging and aiming decouple.
-2. Camera/button sensor fusion: 1ms switch timestamp, aim rewound ~60ms to cancel trigger flinch.
-3. Fair duel over a network: clock sync, synchronized bell, defender-authoritative hits with bullet travel time.
-4. Pose landmarks retargeted to a puppet, ~1KB/frame instead of video.
-5. Firmware: debounce, non-blocking actuation, two-way serial protocol.
-
-Be upfront: MediaPipe landmark models are off-the-shelf neural nets, not language models. Confirm with an organizer. Everything on top is ours.
-
-## Check before committing
-
-- Cold Start eligibility: 75% first-time hackers, no professional SWE experience.
+- Cold Start: 75% first-time hackers, no professional SWE experience.
 - One project allowed in multiple tracks.
-- Two Arduinos, two servos, two switches, long USB cables available.
-- Chrome or Edge on both laptops (Web Serial).
+
+## Execution steps on approval
+
+1. Copy this plan over `PLAN.md`, commit, push to `main` so the team sees the new split and asset list.
+2. Build the Hour 0 skeleton, verify `?debug=mouse` runs in the browser pane, commit and push so teammates can clone.
+3. Continue with M1, M2, then M3 if P2 has not covered it. Commit and push after each milestone.
 
 ## Verification
 
-- `npm run dev` + `?debug=mouse&bot=1`: full round playable with mouse and keyboard.
-- Same with camera: FPS overlay >= 25 with both models running, crosshair jitter under ~10px when hand is still at 5 ft.
-- Glove: press switch, shot fires and servo kicks within the same frame; latency overlay shows switch-to-shot time.
-- `npm run server` on one laptop, both clients connected: clock offset overlay stable within ~10ms, bells ring together (film both screens with a phone), dodged bullets never register as hits on the defender's screen.
-- Pull the glove USB mid-round: game falls back to thumb-drop trigger without reload.
-- Cold walk-up test: someone who has not seen it gets to their first shot in under 30s with no verbal help.
+- `npm run dev` with `?debug=mouse&bot=1`: a full round is playable with mouse and keyboard.
+- With camera: FPS overlay >= 25 with both models, crosshair jitter under ~10px with a still hand at standing distance.
+- Calibration: after the 4 bottles, pointing at each screen corner puts the crosshair there.
+- Trigger: 20 deliberate shots at a bottle, at least 18 register, zero fire while just aiming. Shots land where the crosshair was before the thumb moved.
+- Bot fires tracers, leaning makes them miss, standing still gets you hit, result screen shows draw ms.
+- Later: two laptops ring the bell together (film both screens). Dodged bullets never count on the defender's screen.
+- Cold walk-up: a stranger reaches their first shot in under 30s with no verbal help.
