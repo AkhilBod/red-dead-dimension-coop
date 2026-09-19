@@ -320,6 +320,43 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sim.count("fire"), 1)
 
 
+class GloveButtonTests(unittest.TestCase):
+    def test_button_fires_where_the_aim_was_held_before_the_press(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        held = sim.run(1.0, lambda k: aiming(wrist))
+        jolted = wrist + np.array([0.0, 0.1]) * SW          # pressing the switch jolts the hand down
+        sim.pipeline.press_button(sim.t)
+        sim.run(0.2, lambda k: aiming(jolted))
+        fires = [e for _, e in sim.events if e[0] == "fire"]
+        self.assertEqual(len(fires), 1)
+        self.assertEqual(fires[0][3], "button")
+        self.assertAlmostEqual(fires[0][1], held.aim_x, delta=0.02)
+        self.assertAlmostEqual(fires[0][2], held.aim_y, delta=0.03)
+
+    def test_button_under_the_thumb_is_one_shot_not_two(self):
+        # The switch sits where the thumb lands, so pressing it is also a thumb-drop gesture.
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        sim.run(0.1, lambda k: aiming(wrist, thumb=k))
+        sim.pipeline.press_button(sim.t)
+        sim.run(0.3, lambda k: aiming(wrist, thumb=1.0))
+        self.assertEqual(sim.count("fire"), 1)
+
+    def test_button_respects_the_fire_rate_and_needs_a_gun_hand(self):
+        sim = Sim()
+        sim.pipeline.press_button(sim.t)                     # nobody is aiming
+        sim.run(0.5, lambda k: ([], make_pose()))
+        self.assertEqual(sim.count("fire"), 0)
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        for _ in range(3):                                   # switch bounce / mashing inside one frame
+            sim.pipeline.press_button(sim.t)
+        sim.run(0.1, lambda k: aiming(wrist))
+        self.assertEqual(sim.count("fire"), 1)
+
+
 class RecordedSessionRegressions(unittest.TestCase):
     """Each of these is a bug found by replaying a recorded live session."""
 

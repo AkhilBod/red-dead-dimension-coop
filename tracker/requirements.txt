@@ -1,2 +1,3 @@
 mediapipe==0.10.21
 python-osc>=1.8
+pyserial>=3.5

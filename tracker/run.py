@@ -17,6 +17,7 @@ import cv2
 import protocol as P
 from config import Config
 from debug_view import DebugView
+from glove import FIRE, RELOAD, Glove
 from landmarks import Landmarker, frame_from_json, frame_to_json
 from osc_io import OscIn, OscOut
 from pipeline import Pipeline
@@ -142,6 +143,7 @@ def main():
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--pose-every", type=int, default=1, help="run the body model every Nth frame (2 saves CPU)")
     ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
+    ap.add_argument("--arduino", default="auto", help="glove serial port, e.g. /dev/cu.usbmodem1101 or COM5. auto = find it, off = no glove")
     ap.add_argument("--no-window", action="store_true")
     ap.add_argument("--windowed", action="store_true", help="tuning window not fullscreen (W toggles)")
     ap.add_argument("--frames", type=int, default=0, help="stop after this many frames (0 = run until Q)")
@@ -165,6 +167,7 @@ def main():
         if fullscreen:
             cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     calib = LocalCalibration()
+    glove = None if (args.arduino == "off" or args.replay) else Glove(args.arduino)
     print(f"[tracker] sending to {args.host}:{args.port}, listening on {args.in_port}")
 
     recorder = None
@@ -190,16 +193,23 @@ def main():
             for address, cmd_args in osc_in.poll():
                 print(f"[osc in] {address} {cmd_args}")
                 pipeline.handle_command(address, cmd_args)
+            if glove:
+                for t_press in glove.poll():
+                    pipeline.press_button(t_press)
             state, events = pipeline.update(frame)
             calib.update(pipeline)
             out.state(state)
             for e in events:
                 if e[0] == "fire":
                     out.fire(e[1], e[2])
-                    print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})")
+                    print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})  {e[3]}")
+                    if glove and e[3] != "button":
+                        glove.send(FIRE)        # the switch already buzzed by itself
                 else:
                     out.reload()
                     print(f"[{frame.t:9.2f}] RELOAD")
+                    if glove:
+                        glove.send(RELOAD)
                 counts[e[0]] += 1
             if recorder:
                 recorder.write(frame_to_json(frame) + "\n")
@@ -223,7 +233,7 @@ def main():
             # Drawing the window is the one cost we can shed: when frames are slow, draw fewer of them.
             draw_every = 1 if fps >= 26 else 2 if fps >= LOW_FPS else 3
             if view and counts["frames"] % draw_every == 0:
-                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, pending_events, fps, ms, recorder is not None, low_fps=fps < LOW_FPS and counts["frames"] > 60))
+                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, pending_events, fps, ms, recorder is not None, low_fps=fps < LOW_FPS and counts["frames"] > 60, glove=glove.status if glove else "glove off"))
                 pending_events = []
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
@@ -256,6 +266,8 @@ def main():
         pass
     finally:
         source.close()          # releases the camera and the models
+        if glove:
+            glove.close()
         if recorder:
             recorder.close()
         osc_in.close()

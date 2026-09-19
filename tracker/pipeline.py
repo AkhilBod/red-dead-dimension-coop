@@ -65,6 +65,7 @@ class Pipeline:
         self.last_fire_t = -1e9
         self.last_fire_kind = None
         self.pending_kick = None    # (decide-by time, raw aim): a kick that may yet turn out to be a slap
+        self.button_presses = []    # press times from the glove's trigger switch, handled on the next frame
         self.gun_pose = False
         self.gun_pose_frames = 0
         self.gun_pose_true_t = -1e9
@@ -84,6 +85,10 @@ class Pipeline:
         elif address == P.ADDR_RECENTER:
             self.body.recenter()
             self.recenter_aim = True
+
+    def press_button(self, t_press):
+        """The glove's trigger switch was pressed at time.monotonic() = t_press."""
+        self.button_presses.append(t_press)
 
     # ---- which detections are the player's hands --------------------------------
 
@@ -188,7 +193,7 @@ class Pipeline:
             return                  # thumb drop followed by its own recoil kick: one shot
         x, y = self.mapper.map(raw, self.lever * cfg.aim_gain, push=False)
         self.mapper.add_shot(raw, self.lever * cfg.aim_gain)
-        events.append(("fire", x, y))
+        events.append(("fire", x, y, kind))
         self.last_fire_t, self.last_fire_kind = t, kind
 
     def _reload(self, events, t):
@@ -303,6 +308,14 @@ class Pipeline:
                         self._fire(events, t, self._rewound(t, kick_onset), "flick")
             if thumb_onset is not None:
                 self._fire(events, t, self._rewound(t, thumb_onset), "thumb")
+
+        # The glove's switch. It sits under the thumb, so pressing it is also a thumb drop:
+        # the lockout between different triggers makes that one shot. Like the gestures, the
+        # press jolts the hand, so the shot goes where the aim was held just before it.
+        for t_press in self.button_presses:
+            if self.history.buf and t - self.gun_seen_t < 1.0:
+                self._fire(events, t, self._rewound(t, t_press), "button")
+        self.button_presses = []
 
         if off is not None:
             off_kick = self.off_flick.update(t, (off.p2[WRIST][1] - off.p2[INDEX_TIP][1]) / off.scale)

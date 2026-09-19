@@ -1,7 +1,7 @@
 # IRON HORSE (working title)
 
 A first-person finger-gun train shootout. Red Dead vibe. Single player, PvE, built in Unreal.
-You stand on the roof of a moving steam train. Bandits ride up beside you, climb onto the cars ahead, and fire from a second train. Your hand is the gun. Your body is the dodge. A webcam is the only sensor. No controller, no hardware, no multiplayer.
+You stand on the roof of a moving steam train. Bandits ride up beside you, climb onto the cars ahead, and fire from a second train. Your hand is the gun. Your body is the dodge. A webcam does all the sensing. No controller, no multiplayer. An optional Arduino glove (one switch under the thumb, a buzzer, an LED) adds a physical trigger and a buzz on every shot.
 
 Tracks: **Press Start** (main target), **No Wrapper** (the tracker is the hard part), **Cold Start** (only if we are honestly eligible).
 
@@ -12,7 +12,7 @@ Tracks: **Press Start** (main target), **No Wrapper** (the tracker is the hard p
 | You do this | The game does this |
 |---|---|
 | Make a finger gun and point at the screen | Crosshair follows your hand |
-| Drop your thumb, or kick your hand up like recoil | Fire. However you pretend to shoot, it shoots |
+| Drop your thumb, kick your hand up like recoil, or press the glove's switch | Fire. However you pretend to shoot, it shoots. The glove buzzes and flashes |
 | Slap the bottom of your gun hand with your other hand | Reload (six rounds, like slamming a magazine home) |
 | Lean or sidestep | Your view shifts, bullets miss |
 | Duck | Drop under tunnels, low bridges, and gatling fire |
@@ -57,6 +57,7 @@ webcam -> tracker (Python, MediaPipe landmarks + our signal processing)
 Unreal -> OSC port 7001 -> tracker (calibration, recenter)
 ```
 
+- **Glove (optional):** Arduino on USB serial to the tracker, not to Unreal. Firmware in `arduino/finger_gun_glove/`, protocol in `tracker/README.md`. A switch press arrives in Unreal as an ordinary `/fg/fire`, so the game needs no changes. The tracker buzzes the glove on every shot and reload it detects.
 - Tracker is Python, not a browser tab: a background browser tab gets throttled when Unreal has focus. The tracker runs on CPU, so Unreal keeps the GPU.
 - Unreal uses the built-in **OSC plugin**. Blueprint only, no C++ needed.
 - The tracker can run on the same machine (`127.0.0.1`) or on a second laptop (`--host <unreal machine ip>`) over a phone hotspot if the Unreal laptop is struggling.

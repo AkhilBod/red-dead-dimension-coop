@@ -45,6 +45,24 @@ Keys: **Q** quit, **X** centre the crosshair on where you are pointing now, **[ 
 
 Tell it about the real screen and camera once per setup: `--set screen_width_m=1.2` for a 55 inch TV (default 0.30, a laptop), `--set camera_hfov_deg=78` for a wide webcam (default 60).
 
+## The Arduino glove (optional)
+
+A switch under the thumb, a buzzer and an LED. The **switch is a third trigger** next to the two gestures, and the **buzzer + LED go off on every shot and reload**, including the ones detected from the camera. With no board plugged in the tracker runs exactly as before.
+
+1. Wire it as in Jason's sketch: switch on **6** (reads HIGH when pressed), buzzer on **7**, LED on **8**.
+2. In the Arduino IDE open [arduino/finger_gun_glove/finger_gun_glove.ino](../arduino/finger_gun_glove/finger_gun_glove.ino), upload it, then **close the Serial Monitor** (only one program can hold the port).
+3. `python run.py`. It finds the board by itself and prints `[glove] connected on ...`. The top line of the window shows `glove on <port>`. If it picks the wrong port: `--arduino /dev/cu.usbmodem1101` (Windows: `--arduino COM5`). `--arduino off` skips it.
+
+| Glove to PC | | PC to glove | |
+|---|---|---|---|
+| `READY` | once at boot | `F` | a shot fired: 100 ms buzz + flash |
+| `T` | trigger pressed | `R` | reload: two short clicks |
+| `FG1` | answer to `?` | `H` | got hit: 300 ms buzz (nothing sends this yet) |
+
+115200 baud. Pressing the switch buzzes on the board itself, with no round trip, so it still works with no PC attached. The tracker sends `F` only for shots that did *not* come from the switch, so nothing buzzes twice. The switch sits where the thumb lands, so pressing it is also a thumb-drop gesture: the tracker counts that as one shot. Like the gestures, a press jolts the hand, so the shot lands where the aim was held just before it.
+
+Jason's original [switch_led_buzz.ino](../arduino/switch_led_buzz/switch_led_buzz.ino) is untouched, as the standalone wiring test.
+
 ## Reading the window
 
 - Green skeleton = the gun hand. Orange = the other hand. Dark red "ignored" = a detection judged not to be your hand (background object, spectator, duplicate). Yellow line = shoulders.
@@ -109,6 +127,7 @@ Synthetic landmarks, no camera. They check the logic (one shot per pull, aim rew
 | [aim.py](aim.py) | fingertip position relative to the chest -> screen: geometric gain, learned centre, edge push, calibration, aim history |
 | [trigger.py](trigger.py) | thumb drop and recoil kick, each reporting when the gesture *began* |
 | [reload.py](reload.py) | a kick while the hands are together is a reload, a kick with them apart is a shot |
+| [glove.py](glove.py) | serial link to the Arduino glove: trigger presses in, buzzer/LED codes out, reconnects by itself |
 | [pipeline.py](pipeline.py) | ties it together, no camera or network inside so it can be tested |
 | [one_euro.py](one_euro.py), [windows.py](windows.py) | speed-adaptive low-pass filter, time-windowed medians and percentiles |
 | [config.py](config.py) | every threshold, with units |

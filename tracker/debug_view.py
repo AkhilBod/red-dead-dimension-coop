@@ -35,7 +35,7 @@ class DebugView:
             mx = int(x0 + float(np.clip((m - lo) / (hi - lo), 0, 1)) * bw)
             cv2.line(img, (mx, y0 - bh - 3), (mx, y0 + 3), c, 2)
 
-    def draw(self, bgr, frame, pipeline, state, events, fps, ms, recording=False, low_fps=False):
+    def draw(self, bgr, frame, pipeline, state, events, fps, ms, recording=False, low_fps=False, glove=""):
         w, h = self.w, self.h
         img = np.full((h, w, 3), 24, np.uint8) if bgr is None else cv2.resize(bgr, (w, h))
         dbg, body, cfg = pipeline.debug, pipeline.body, pipeline.cfg
@@ -95,11 +95,11 @@ class DebugView:
         cv2.line(img, (cx - 26, cy), (cx + 26, cy), color, 1, cv2.LINE_AA)
         cv2.line(img, (cx, cy - 26), (cx, cy + 26), color, 1, cv2.LINE_AA)
 
-        for x0, y0, x1, y1 in ((0, 0, 640, 60), (0, 60, 320, 240), (0, h - 30, w, h)):
+        for x0, y0, x1, y1 in ((0, 0, 860, 60), (0, 60, 320, 240), (0, h - 30, w, h)):
             img[y0:y1, x0:x1] = (img[y0:y1, x0:x1] * 0.35).astype(np.uint8)     # dark backing so text reads over video
         cv2.putText(img, f"{fps:4.1f} fps  {ms:4.1f} ms   gun arm {dbg.get('gun_arm') or '?'}   "
                          f"gain {cfg.aim_gain:.2f} x lever {dbg.get('lever', 0):.1f}   {'calibrated' if pipeline.mapper.calibrated else ('centred' if pipeline.mapper.centered else 'centring...')}"
-                         f"{'   REC' if recording else ''}", (12, 22), FONT, 0.55, WHITE, 1, cv2.LINE_AA)
+                         f"   {glove}{'   REC' if recording else ''}", (12, 22), FONT, 0.55, WHITE, 1, cv2.LINE_AA)
         flags = [("TRACK", state.tracking), ("GUN", state.gun_pose), ("AIM", state.aim_valid),
                  ("HOLSTER", state.holstered), ("OPEN", state.off_hand_open)]
         x = 12
