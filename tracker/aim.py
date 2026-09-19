@@ -76,8 +76,10 @@ class AimMapper:
         self.center = np.array(raw, dtype=float)
 
     def forget_center(self):
-        if not self.calibrated:
-            self.center = None
+        """Calibrated or not. Calibration's lasting value is the gain (k). The centre belongs
+        to a posture: seen live, a player calibrated, walked off, sat back down differently,
+        and the crosshair stayed pinned to the left edge for the rest of the session."""
+        self.center = None
 
     def map(self, raw, lever, push=True):
         if self.center is None or raw is None:

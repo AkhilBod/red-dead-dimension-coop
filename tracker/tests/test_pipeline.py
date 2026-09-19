@@ -267,6 +267,23 @@ class PipelineTests(unittest.TestCase):
         self.assertAlmostEqual(state.aim_x, 0.5, delta=0.02)
         self.assertAlmostEqual(state.aim_y, 0.5, delta=0.02)
 
+    def test_coming_back_in_a_new_posture_recentres_even_after_calibration(self):
+        sim = Sim()
+        base = rest_wrist()
+        sim.pipeline.handle_command(P.ADDR_CALIB_BEGIN, ())
+        for target, offset in (((0.15, 0.2), (-0.3, -0.18)), ((0.85, 0.2), (0.3, -0.18)), ((0.85, 0.8), (0.3, 0.18)), ((0.15, 0.8), (-0.3, 0.18))):
+            sim.pipeline.handle_command(P.ADDR_CALIB_TARGET, target)
+            sim.run(0.6, lambda k: aiming(base + np.array(offset) * SW))
+            pull_trigger(sim, base + np.array(offset) * SW)
+        self.assertTrue(sim.pipeline.mapper.calibrated)
+        gain = sim.pipeline.mapper.k.copy()
+        sim.run(3.0, lambda k: ([], make_pose()))               # hand down for a while
+        elsewhere = base + np.array([1.2, 0.7]) * SW            # comes back held somewhere quite different
+        state = sim.run(0.8, lambda k: aiming(elsewhere))
+        self.assertAlmostEqual(state.aim_x, 0.5, delta=0.02)
+        self.assertAlmostEqual(state.aim_y, 0.5, delta=0.02)
+        np.testing.assert_allclose(sim.pipeline.mapper.k, gain)     # the calibrated sensitivity is kept
+
     def test_landmark_noise_causes_no_events_and_little_jitter(self):
         sim = Sim(noise=0.001)      # about 1.3 px at 720p, in line with what a recorded session showed
         wrist = rest_wrist()
