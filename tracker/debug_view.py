@@ -35,7 +35,7 @@ class DebugView:
             mx = int(x0 + float(np.clip((m - lo) / (hi - lo), 0, 1)) * bw)
             cv2.line(img, (mx, y0 - bh - 3), (mx, y0 + 3), c, 2)
 
-    def draw(self, bgr, frame, pipeline, state, events, fps, ms, recording=False):
+    def draw(self, bgr, frame, pipeline, state, events, fps, ms, recording=False, low_fps=False):
         w, h = self.w, self.h
         img = np.full((h, w, 3), 24, np.uint8) if bgr is None else cv2.resize(bgr, (w, h))
         dbg, body, cfg = pipeline.debug, pipeline.body, pipeline.cfg
@@ -125,6 +125,9 @@ class DebugView:
         self._bar(img, 4, "lean", state.lean, -1.0, 1.0)
         self._bar(img, 5, "duck", state.duck, 0.0, 1.0)
 
+        if low_fps:
+            cv2.rectangle(img, (0, h // 2 - 34), (w, h // 2 + 22), (0, 0, 120), -1)
+            cv2.putText(img, f"LOW FRAME RATE ({fps:.0f} fps): nothing here can be trusted. Close other apps.", (20, h // 2 + 4), FONT, 0.75, WHITE, 2, cv2.LINE_AA)
         if frame.t < self.flash[1]:
             cv2.putText(img, self.flash[0], (w // 2 - 80, 70), cv2.FONT_HERSHEY_DUPLEX, 1.5, YELLOW, 3, cv2.LINE_AA)
         cv2.putText(img, KEYS, (12, h - 12), FONT, 0.4, WHITE, 1, cv2.LINE_AA)

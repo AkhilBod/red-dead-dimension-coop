@@ -244,6 +244,22 @@ class PipelineTests(unittest.TestCase):
             self.assertAlmostEqual(state.aim_x, 0.5, delta=0.02)
             self.assertAlmostEqual(state.aim_y, 0.5, delta=0.02)
 
+    def test_centre_is_where_the_hand_comes_to_rest_not_where_it_is_first_seen(self):
+        sim = Sim()
+        rest = rest_wrist()
+        low = rest + np.array([0.1, 0.9]) * SW              # first seen just above the holster line, on its way up
+        sim.run(0.3, lambda k: aiming(low + (rest - low) * k))
+        state = sim.run(0.6, lambda k: aiming(rest))
+        self.assertAlmostEqual(state.aim_x, 0.5, delta=0.03)
+        self.assertAlmostEqual(state.aim_y, 0.5, delta=0.03)
+
+    def test_a_hand_that_never_holds_still_still_gets_a_centre(self):
+        sim = Sim()
+        rest = rest_wrist()
+        wobble = lambda k: aiming(rest + np.array([0.0, 0.25 * np.sin(k * 40)]) * SW)
+        sim.run(1.2, wobble)
+        self.assertTrue(sim.pipeline.mapper.centered)
+
     def test_pushing_past_the_edge_does_not_lose_the_crosshair(self):
         sim = Sim()
         wrist = rest_wrist()

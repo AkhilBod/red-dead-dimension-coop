@@ -57,6 +57,7 @@ class Pipeline:
         self.lever = 2.0            # screen travel per fingertip travel, from the depths of chest and hand
         self.still_since = None     # for learning the aim centre
         self.centering = []
+        self.lock_t = None
         self.recenter_aim = False
         self.gun_arm = None         # which arm holds the gun. Sticky: it is who the player is, not where a hand is
         self.arm_votes = 0
@@ -128,6 +129,7 @@ class Pipeline:
         self.hand_speed = 0.0
         self.still_since = None
         self.centering = []
+        self.lock_t = None
         self.aim_filter.reset()
         self.history.clear()
         self.gun_scale.clear()
@@ -260,17 +262,27 @@ class Pipeline:
                 self.hand_speed += (v - self.hand_speed) * 0.5
             self.gun_pos, self.gun_center, self.gun_seen_t = gun.wrist, gun.center, t
 
-            # Where the player first points is "the middle of the screen". No waiting for a
-            # still hand: a recorded player started pumping shots at once and never held still.
+            # Where the player first points is "the middle of the screen". That is where the hand
+            # comes to REST, not where it is first seen: seen live, the centre was taken while the
+            # hand was still on its way up, and the first shots landed in the top corner. But do
+            # not wait for stillness forever either: a recorded player started pumping shots at
+            # once and never held still, so after aim_settle_max_s take what we have.
             if self.recenter_aim:
                 self.mapper.center_on(raw)
                 self.recenter_aim = False
             elif not self.mapper.centered:
-                self.centering.append(raw)
-                if self.still_since is None:
-                    self.still_since = t
-                elif t - self.still_since >= cfg.aim_settle_s:
+                if self.lock_t is None:
+                    self.lock_t = t
+                if self.hand_speed > cfg.aim_settle_speed:
+                    self.still_since, self.centering = None, []
+                else:
+                    self.centering.append(raw)
+                    if self.still_since is None:
+                        self.still_since = t
+                if self.still_since is not None and t - self.still_since >= cfg.aim_settle_s:
                     self.mapper.center_on(np.median(np.array(self.centering), axis=0))
+                elif t - self.lock_t >= cfg.aim_settle_max_s:
+                    self.mapper.center_on(raw)
             # While the hands are together (a reload) the tracked hand may be the wrong one, so the
             # crosshair holds still. And only a hand moving at a human pace may push the mapping off
             # a screen edge: a tracking jump must not drag the centre away with it.

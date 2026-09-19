@@ -42,7 +42,9 @@ class Config:
     aim_lever_min: float = 1.2
     aim_lever_max: float = 4.0
     aim_gain: float = 0.75              # x the geometric gain. 1.0 = crosshair travels as far as an eye-fingertip ray. [ and ] keys
-    aim_settle_s: float = 0.25          # the median fingertip position over this long after the hand comes up = screen centre
+    aim_settle_speed: float = 0.25      # m/s. Once the raised hand is slower than this...
+    aim_settle_s: float = 0.2           # ...for this long, where it points is the middle of the screen
+    aim_settle_max_s: float = 0.8       # never settles (player firing at once): use wherever it is by then
     aim_recenter_after_s: float = 2.0   # gun hand gone this long: learn the centre again when it comes back
     aim_push_max_speed: float = 1.2     # m/s. Faster than this is a tracking jump, not a hand pushing past the screen edge
     calib_gain_min: float = 0.4         # calibration may scale the geometric gain by this much, no more

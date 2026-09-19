@@ -23,6 +23,7 @@ from pipeline import Pipeline
 
 CALIB_CORNERS = [(0.15, 0.2), (0.85, 0.2), (0.85, 0.8), (0.15, 0.8)]
 WINDOW = "finger gun tracker"
+LOW_FPS = 20
 
 
 class Camera:
@@ -182,6 +183,7 @@ def main():
     source = replay_frames(args.replay, args.realtime) if args.replay else camera_frames(args, cfg)
     counts = {"frames": 0, "fire": 0, "reload": 0, "hands": 0, "body": 0}
     fps, last_wall = 0.0, time.monotonic()
+    low_fps_warned, pending_events = 0.0, []
     try:
         for bgr, frame in source:
             work_start = time.monotonic()
@@ -211,8 +213,18 @@ def main():
             # Landmarks were computed before this loop body ran, so add their age for the true per-frame cost.
             ms = (now - frame.t) * 1000 if not args.replay else (now - work_start) * 1000
 
-            if view:
-                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, events, fps, ms, recorder is not None))
+            # Every time-based rule in the detectors assumes ~30 frames a second. Seen live: on a
+            # machine deep in swap the tracker fell to 3 fps and nothing it did meant anything.
+            if counts["frames"] > 60 and fps < LOW_FPS and now - low_fps_warned > 5.0:
+                low_fps_warned = now
+                print(f"[tracker] LOW FRAME RATE: {fps:.0f} fps. Triggers and aim are unreliable below {LOW_FPS}. "
+                      "Close other apps, or try --pose-every 2 / --no-window.")
+            pending_events += events
+            # Drawing the window is the one cost we can shed: when frames are slow, draw fewer of them.
+            draw_every = 1 if fps >= 26 else 2 if fps >= LOW_FPS else 3
+            if view and counts["frames"] % draw_every == 0:
+                cv2.imshow(WINDOW, view.draw(bgr, frame, pipeline, state, pending_events, fps, ms, recorder is not None, low_fps=fps < LOW_FPS and counts["frames"] > 60))
+                pending_events = []
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
                     break
