@@ -9,8 +9,8 @@ import bpy
 
 from . import anims, core, horse, human, props, variants
 
-SHOWCASE = {"Bandit": "aim", "Gunslinger": "showdown_idle", "Rifleman": "rifle_aim", "Deputy": "idle", "Dynamiter": "throw",
-            "Heavy": "gatling_fire", "Boss": "showdown_idle"}
+SHOWCASE = {"Bandit": "aim", "Gunslinger": "dual_aim", "Rifleman": "rifle_aim", "Deputy": "idle", "Dynamiter": "throw",
+            "Heavy": "gatling_fire", "Boss": "hip_aim"}
 
 
 def build():
@@ -102,7 +102,7 @@ def _clear_nla(arm, saved):
     core.set_action(arm, saved)
 
 
-def export_rig(arm, path_noext, actions=None, glb=True):
+def export_rig(arm, path_noext, actions=None, glb=True, fbx_anims=True):
     meshes = [o for o in arm.children if o.type == "MESH"]
     real_name = arm.name
     loc = arm.location.copy()
@@ -119,7 +119,7 @@ def export_rig(arm, path_noext, actions=None, glb=True):
     _select([arm] + meshes)
     try:
         bpy.ops.export_scene.fbx(filepath=path_noext + ".fbx", use_selection=True, object_types={"ARMATURE", "MESH"},
-                                 add_leaf_bones=False, bake_anim=bool(actions), bake_anim_use_all_bones=True,
+                                 add_leaf_bones=False, bake_anim=bool(actions) and fbx_anims, bake_anim_use_all_bones=True,
                                  bake_anim_use_nla_strips=True, bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True,
                                  bake_anim_simplify_factor=0.0, mesh_smooth_type="FACE", use_armature_deform_only=False,
                                  axis_forward="-Y", axis_up="Z", apply_scale_options="FBX_SCALE_NONE")
@@ -148,11 +148,13 @@ def export_static(ob, path_noext):
 def export_all(outdir):
     for sub in ("characters", "horses", "props"):
         os.makedirs(os.path.join(outdir, sub), exist_ok=True)
-    human_acts = [a for a in bpy.data.actions if not a.name.startswith(("horse_", "gatling_spin"))]
-    horse_acts = [a for a in bpy.data.actions if a.name.startswith("horse_")]
+    human_acts = [bpy.data.actions[n] for n in anims.NAMES]
+    horse_acts = [bpy.data.actions["horse_" + n] for n in ("idle", "walk", "gallop", "rear", "death")]
     done = []
     for name in variants.VARIANTS:
-        export_rig(bpy.data.objects[name], os.path.join(outdir, "characters", "SK_" + name), human_acts)
+        # FBX animation bakes are ~11 MB each. Same-scale variants reuse the Bandit's; the GLBs always carry everything.
+        full = name == "Bandit" or variants.VARIANTS[name].get("scale", 1.0) != 1.0
+        export_rig(bpy.data.objects[name], os.path.join(outdir, "characters", "SK_" + name), human_acts, fbx_anims=full)
         done.append(name)
     for name in variants.HORSES:
         export_rig(bpy.data.objects[name], os.path.join(outdir, "horses", "SK_" + name), horse_acts)

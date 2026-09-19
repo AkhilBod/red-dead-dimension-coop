@@ -23,8 +23,9 @@ THUMB_O = WRI + ARM_D * 0.030 + Vector((0, -0.040, 0)) - ARM_N * 0.006
 THUMB_D = (ARM_D * 0.65 + Vector((0, -0.75, 0))).normalized()
 
 
-def skeleton():
+def skeleton(cfg=None):
     V = Vector
+    tip = muzzle_tip(cfg or {})
     b = [
         ("root", None, (0, 0, 0), (0, 0.15, 0)),
         ("pelvis", "root", (0, 0, 0.98), (0, 0, 1.08)),
@@ -44,6 +45,7 @@ def skeleton():
             ("lowerarm_" + sd, "upperarm_" + sd, m(ELB), m(WRI)),
             ("hand_" + sd, "lowerarm_" + sd, m(WRI), m(KNU)),
             ("weapon_" + sd, "hand_" + sd, m(GRIP), m(GRIP + ARM_D * 0.10)),
+            ("muzzle_" + sd, "weapon_" + sd, m(tip), m(tip + ARM_D * 0.08)),
             ("thumb_01_" + sd, "hand_" + sd, m(THUMB_O), m(THUMB_O + THUMB_D * 0.036)),
             ("thumb_02_" + sd, "thumb_01_" + sd, m(THUMB_O + THUMB_D * 0.036), m(THUMB_O + THUMB_D * 0.068)),
         ]
@@ -443,6 +445,18 @@ def hand_xf(up_canon_to=(0, -1, 0), origin=(0, 0.025, -0.040), scale=props.GUN_S
     return Matrix.Translation(GRIP) @ (rot * scale).to_4x4() @ Matrix.Translation(-Vector(origin))
 
 
+def muzzle_tip(c):
+    """Barrel tip in left-hand rest space; mirrored for the right hand."""
+    wpn = c.get("weapon", "revolver")
+    if wpn in ("rifle", "shotgun"):
+        p, origin, scale = (0, -0.80 if wpn == "rifle" else -0.70, 0.034), (0, 0.035, -0.020), 1.12
+    elif wpn == "dynamite":
+        p, origin, scale = (0.03, -0.015, 0.17), (0, 0, -0.03), 1.2
+    else:
+        p, origin, scale = (0, -0.082 - (0.27 if c.get("long_barrel") else 0.21), 0.048), (0, 0.025, -0.040), props.GUN_SCALE
+    return hand_xf(origin=origin, scale=scale) @ Vector(p)
+
+
 def build_weapons(name, c, coll, arm, S):
     obs = []
     wpn = c.get("weapon", "revolver")
@@ -468,7 +482,7 @@ def build_weapons(name, c, coll, arm, S):
 def build_human(name, c, location=(0, 0, 0)):
     S = c.get("scale", 1.0)
     coll = get_collection(name, get_collection("WW_Characters"))
-    arm = build_armature(name, skeleton(), coll, scale=S)
+    arm = build_armature(name, skeleton(c), coll, scale=S)
     sc = Matrix.Scale(S, 4)
     parts = []
     for suffix, fn in (("body", build_body), ("hat", build_hat), ("neckwear", build_neckwear),

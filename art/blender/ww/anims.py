@@ -232,6 +232,32 @@ def p_showdown(b=0.0, tw=0.0):
                   "hand_l": aim((0.0, -0.3, -1), (0.3, -1, 0))}, fist("l", 0.35 + 0.1 * b, 0.3))
 
 
+def p_dual(rr=0.0, rl=0.0, sway=0.0):
+    def gun(side, rec):
+        sx = 1 if side == "l" else -1
+        w = Vector((0.17 * sx, 0.0, 1.46)) + Vector((0.02 * sx, -1, 0.03)).normalized() * (0.52 - 0.10 * rec) + Vector((0, 0, 0.01 * sway + 0.07 * rec))
+        return arm(side, tuple(w), (0.6 * sx, 0.2, -1), (0.02 * sx, -1, 0.03 + 0.40 * rec), (0, 0, 1) if rec < 0.2 else (0, 0.5, 1), grip=1.0, trigger=0.5 + 0.4 * rec)
+    return merge(torso(lean=3 - 4 * (rr + rl), twist=8 * (rl - rr), head=(2, 0, 0), ploc=(0, 0.02 * (rr + rl), -0.06)), stance(0.22, lf=-0.04, rf=0.04, yaw=20),
+                 gun("r", rr), gun("l", rl))
+
+
+def p_hip(rec=0.0, fan=0.0):
+    """Gun at the hip. fan = the off hand slapping the hammer."""
+    w = (-0.26, -0.22 + 0.07 * rec, 1.06 + 0.04 * rec)
+    left = arm("l", (-0.10 + 0.10 * (1 - fan), -0.20 - 0.10 * fan, 1.16 + 0.10 * (1 - fan)), (1, 0.4, -0.4), (-1, -0.3, -0.2), (0, 0.2, 1), grip=0.0) if fan is not None else \
+        merge({"upperarm_l": aim((0.45, 0.10, -1)), "lowerarm_l": aim((0.15, -0.25, -1)), "hand_l": aim((0.0, -0.3, -1), (0.3, -1, 0))}, fist("l", 0.3, 0.3))
+    return merge(torso(lean=-4 - 5 * rec, twist=10, head=(4, 0, -8), ploc=(0, 0.02 * rec, -0.10)), stance(0.24, lf=-0.06, rf=0.06, yaw=24),
+                 arm("r", w, (-1, 0.8, -0.2), (0.0, -1, 0.06 + 0.35 * rec), (0, 0, 1), grip=1.0, trigger=0.9), left)
+
+
+def p_kneel(rec=0.0, sway=0.0):
+    w = Vector((-0.20, -0.02, 0.98)) + Vector((0, -1, 0.05)).normalized() * (0.50 - 0.10 * rec) + Vector((0, 0, 0.01 * sway + 0.07 * rec))
+    return merge(torso(lean=8 - 5 * rec, twist=22, head=(-2, 0, -20), ploc=(0.0, 0.06, -0.47)),
+                 leg("l", (0.17, -0.22, ANK_Z), yaw=12), leg("r", (-0.16, 0.36, 0.13), pitch=58, yaw=6, ball=45),
+                 arm("r", tuple(w), (-0.5, 0.2, -1), (0, -1, 0.05 + 0.4 * rec), (0, 0, 1) if rec < 0.2 else (0, 0.5, 1), grip=1.0, trigger=0.5 + 0.4 * rec),
+                 arm("l", (0.20, -0.30, 0.62), (1, 0.2, 0.3), (0, -0.6, -1), (0.4, -1, 0), grip=0.3))
+
+
 # ---------------------------------------------------------------- two-handed (rifle / shotgun)
 
 def p_long(w, b, up=(0, 0, 1), lean=0, twist=30, head=(4, 8, -28), support=0.46, lf=0.10, rf=-0.14, ploc=(0, 0.02, -0.04),
@@ -311,12 +337,17 @@ def p_gatling(ph):
 
 # ---------------------------------------------------------------- build
 
+NAMES = []
+
+
 def build_human_actions(arm_ob):
     P = Poser(arm_ob)
     A = {}
 
     def add(name, keys, loop=False):
         A[name] = make_action(arm_ob, P, name, keys, loop)
+        if name not in NAMES:
+            NAMES.append(name)
 
     add("idle", [(0, p_idle(0)), (30, p_idle(1)), (60, p_idle(0))], loop=True)
     add("walk", [(f, p_walk(f / 32)) for f in range(0, 33, 2)], loop=True)
@@ -340,12 +371,35 @@ def build_human_actions(arm_ob):
     add("showdown_idle", [(0, p_showdown(0, 0)), (12, p_showdown(1, 1)), (24, p_showdown(0, 0)), (34, p_showdown(1, 1)), (48, p_showdown(0, 0))], loop=True)
     add("quickdraw", [(0, p_showdown(0, 0)), (3, merge(p_showdown(0, 0), arm("r", (-0.36, 0.04, 1.02), (-1, 0.6, -0.2), (-0.1, -0.8, -0.5), (-0.2, -0.4, 1), grip=1.0))),
                       (7, p_aim(0, 0.1)), (9, p_aim(0, 1.0)), (13, p_aim(0, 0.4)), (20, p_aim(0))])
+    rc = lambda t: (0, 1.0, 0.55, 0.2, 0.05)[t]
+    burst = []
+    for k in range(3):
+        burst += [(k * 9, p_aim(0)), (k * 9 + 2, p_aim(0, 1.0)), (k * 9 + 5, p_aim(0, 0.45))]
+    add("shoot_burst", burst + [(32, p_aim(0))])
+    add("dual_aim", [(0, p_dual()), (20, p_dual(sway=1)), (40, p_dual())], loop=True)
+    add("dual_shoot", [(0, p_dual()), (2, p_dual(1.0, 0)), (5, p_dual(0.5, 0)), (9, p_dual(0.1, 0)), (11, p_dual(0.05, 1.0)), (14, p_dual(0, 0.5)), (18, p_dual(0, 0.1)),
+                       (22, p_dual())])
+    add("hip_aim", [(0, p_hip(0, None)), (20, p_hip(0.03, None)), (40, p_hip(0, None))], loop=True)
+    add("hip_fire", [(0, p_hip(0, None)), (2, p_hip(1.0, None)), (5, p_hip(0.5, None)), (12, p_hip(0, None))])
+    fan = [(0, p_hip(0, None)), (4, p_hip(0, 0.0))]
+    for k in range(4):
+        f = 6 + k * 5
+        fan += [(f, p_hip(0.1, 1.0)), (f + 1, p_hip(1.0, 0.6)), (f + 3, p_hip(0.5, 0.0))]
+    add("fan_fire", fan + [(32, p_hip(0, None))])
+    add("kneel_aim", [(0, p_kneel()), (20, p_kneel(sway=1)), (40, p_kneel())], loop=True)
+    add("kneel_shoot", [(0, p_kneel()), (2, p_kneel(1.0)), (5, p_kneel(0.55)), (10, p_kneel(0.08)), (14, p_kneel())])
+    add("cover_shoot", [(0, p_cover(0)), (6, p_aim(0)), (12, p_aim(1)), (14, p_aim(0, 1.0)), (17, p_aim(0, 0.5)), (22, p_aim(0)), (27, merge(p_aim(0), torso(lean=16, twist=16, head=(0, 0, -14), ploc=(0, 0.06, -0.28)))),
+                        (33, p_cover(0))])
+    add("walk_shoot", [(f, merge(p_walk(f / 32), {k: v for k, v in p_aim(0, (0, 1.0, 0.5, 0.15)[(f // 2) % 8] if (f // 2) % 8 < 4 else 0).items()
+                                                 if k.endswith("_r") and not k.startswith(("thigh", "foot", "ball", "calf"))})) for f in range(0, 33, 2)], loop=True)
     # long guns
     add("rifle_idle", [(0, p_rifle_idle(0)), (30, p_rifle_idle(1)), (60, p_rifle_idle(0))], loop=True)
     add("rifle_aim_start", [(0, p_rifle_idle(0)), (14, p_rifle_aim(sway=1)), (20, p_rifle_aim())])
     add("rifle_aim", [(0, p_rifle_aim()), (20, p_rifle_aim(sway=1)), (40, p_rifle_aim())], loop=True)
     add("rifle_shoot", [(0, p_rifle_aim()), (2, p_rifle_aim(1.0)), (6, p_rifle_aim(0.4)), (10, p_rifle_aim(0.1, 0.0)), (15, p_rifle_aim(0, 1.0)),
                         (20, p_rifle_aim(0, 0.0)), (24, p_rifle_aim())])
+    add("shotgun_shoot", [(0, p_rifle_aim()), (2, p_rifle_aim(1.8)), (7, p_rifle_aim(0.9)), (13, p_rifle_aim(0.2)), (18, p_rifle_aim(0, 0.6)), (24, p_rifle_aim())])
+    add("rifle_hit", [(0, p_rifle_aim()), (3, merge(p_rifle_aim(0.6), torso(lean=-14, twist=10, head=(-16, 0, -10), ploc=(0.02, 0.07, -0.06)))), (14, p_rifle_aim())])
     # mounted
     add("ride_idle", [(0, p_ride(0, 0.12)), (20, p_ride(0.5, 0.12)), (40, p_ride(1.0, 0.12))], loop=True)
     for nm, mode in (("ride_gallop", "reins"), ("ride_aim_left", "aim_l"), ("ride_aim_right", "aim_r")):

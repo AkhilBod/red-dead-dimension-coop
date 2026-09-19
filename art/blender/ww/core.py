@@ -24,6 +24,15 @@ PAL = {
     # misc
     "dynamite": "#C2352B", "fuse": "#D8C9A0", "spark": "#FFD36B", "eye": "#1A1414", "bone": "#E9DFC8",
     "rope": "#B89A66",
+    # world
+    "sand": "#E2BC85", "sand_light": "#EDCF9C", "sand_dark": "#CBA06A", "dirt": "#B08A5E", "gravel": "#8B7F72",
+    "rock_red": "#B5603C", "rock_orange": "#CC7A45", "rock_pale": "#D9A06B", "rock_dark": "#7E3F2B", "rock_grey": "#8A7B6E",
+    "cactus": "#5E7F4A", "cactus_dark": "#47643A", "sage": "#8C9670", "flower": "#D8567A", "deadwood": "#6B5745",
+    "plank": "#9A6B43", "plank_dark": "#6F4A2E", "plank_light": "#B98A5A", "plank_grey": "#8A7A68", "paint_white": "#E4DAC4",
+    "paint_red": "#9C3B2E", "paint_green": "#3F5A47", "paint_blue": "#4A6378", "paint_yellow": "#D0A446",
+    "shingle": "#5A4136", "tin": "#9AA0A2", "glass": "#2B3A44", "glass_lit": "#F2C66B", "iron": "#2A2A2D", "iron_red": "#7E2B22",
+    "coal": "#1B1A1C", "canvas": "#D8C8A4", "bottle_green": "#3F7A55", "bottle_brown": "#7A4A22", "paper": "#E2D3AE",
+    "tracer": "#FFE08A", "flash": "#FFB347", "lead": "#6D6A70", "water": "#5F8FA0",
     # horse coats
     "horse_bay": "#7A4527", "horse_chestnut": "#9A5A30", "horse_black": "#2B2422", "horse_grey": "#A9A39A",
     "horse_palomino": "#D3A868", "horse_white": "#E7E0D2", "hoof": "#2E2722", "mane_black": "#1E1917",
@@ -60,7 +69,7 @@ def get_mat(key):
             bsdf.inputs["Roughness"].default_value = 0.35 if key in ("steel", "steel_dark", "brass") else 0.9
             if key in ("steel", "steel_dark", "brass"):
                 bsdf.inputs["Metallic"].default_value = 0.8
-            if key == "spark":
+            if key in ("spark", "tracer", "flash", "glass_lit"):
                 try:
                     bsdf.inputs["Emission Color"].default_value = col
                     bsdf.inputs["Emission Strength"].default_value = 4.0
@@ -81,6 +90,9 @@ def wipe(prefixes=("WW",)):
     """Remove everything this generator made."""
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob, do_unlink=True)
+    for act in list(bpy.data.actions):
+        act.use_fake_user = False
+        bpy.data.actions.remove(act)
     for coll in (bpy.data.meshes, bpy.data.armatures, bpy.data.actions, bpy.data.cameras, bpy.data.lights,
                  bpy.data.curves):
         for d in list(coll):
@@ -88,6 +100,9 @@ def wipe(prefixes=("WW",)):
                 coll.remove(d)
     for c in list(bpy.data.collections):
         bpy.data.collections.remove(c)
+    for m in list(bpy.data.materials):
+        if m.name.startswith("WW_"):
+            bpy.data.materials.remove(m)
 
 
 def _se(v, p):
@@ -469,3 +484,36 @@ def smooth(t):
 def bell(t):
     """0 -> 1 -> 0 over t in [0,1]."""
     return sin(pi * max(0.0, min(1.0, t))) ** 2
+
+
+def cyl(mb, a, b, r, mat, n=8, r2=None, w=None, caps=(True, True), p=2.0, front=(0, -1, 0)):
+    """Cylinder / cone between two points."""
+    return mb.loft([R(a, r, w=w), R(b, r if r2 is None else r2, w=w)], mat, n=n, caps=caps, p=p, front=front)
+
+
+def gable(mb, center, size, rise, mat, w=None, overhang=0.0, ridge_along="x", end_mat=None):
+    """Gabled roof. `size` = (x, y) footprint, base at center z, ridge `rise` above it."""
+    cx, cy, cz = center
+    sx, sy = size[0] / 2 + overhang, size[1] / 2 + overhang
+    if ridge_along == "x":
+        v = [(cx - sx, cy - sy, cz), (cx + sx, cy - sy, cz), (cx + sx, cy + sy, cz), (cx - sx, cy + sy, cz),
+             (cx - sx, cy, cz + rise), (cx + sx, cy, cz + rise)]
+        roof, ends = [(0, 1, 5, 4), (2, 3, 4, 5)], [(0, 4, 3), (1, 2, 5)]
+    else:
+        v = [(cx - sx, cy - sy, cz), (cx + sx, cy - sy, cz), (cx + sx, cy + sy, cz), (cx - sx, cy + sy, cz),
+             (cx, cy - sy, cz + rise), (cx, cy + sy, cz + rise)]
+        roof, ends = [(1, 2, 5, 4), (3, 0, 4, 5)], [(0, 1, 4), (2, 3, 5)]
+    vs = [mb.vert(p, w) for p in v]
+    for f in roof:
+        mb.face([vs[i] for i in f], mat)
+    for f in ends:
+        mb.face([vs[i] for i in f], end_mat or mat)
+    mb.face([vs[0], vs[1], vs[2], vs[3]], end_mat or mat)
+
+
+def static(name, fn, collection, location=(0, 0, 0), **kw):
+    mb = MB(name)
+    fn(mb, **kw)
+    ob = mb.finish(collection)
+    ob.location = location
+    return ob
