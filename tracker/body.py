@@ -10,6 +10,7 @@ import numpy as np
 
 from hand_features import iso2d
 from one_euro import OneEuro
+from windows import TimedWindow
 
 L_SHOULDER, R_SHOULDER = 11, 12
 L_WRIST, R_WRIST = 15, 16
@@ -28,7 +29,8 @@ class BodyTracker:
         self.anchor_filter = OneEuro(cfg.anchor_min_cutoff, cfg.anchor_beta)
         self.lean_filter = OneEuro(cfg.lean_min_cutoff, cfg.lean_beta)
         self.duck_filter = OneEuro(cfg.lean_min_cutoff, cfg.lean_beta)
-        self.sw = None              # shoulder-width envelope, H
+        self.sw = None              # shoulder width, H (robust, see update)
+        self.sw_window = TimedWindow(cfg.sw_window_s)
         self.anchor = None          # filtered mid-shoulder point, H
         self.anchor_raw = None
         self.neutral_x = None       # chest X that means lean = 0
@@ -51,6 +53,10 @@ class BodyTracker:
 
     def tracking(self, t):
         return t - self.last_seen_t <= self.cfg.tracking_hold_s
+
+    def scale(self):
+        """Image heights per real metre at the chest's depth."""
+        return self.sw / self.cfg.shoulder_width_m
 
     def holster_y(self):
         return self.anchor[1] + self.cfg.holster_below_shoulder * self.sw
@@ -84,19 +90,16 @@ class BodyTracker:
 
         if t - self.last_seen_t > cfg.baseline_forget_s:
             self.baseline_set = False           # player walked off, the next one is a new person
+            self.sw_window.clear()
         self.last_seen_t = t
         self.pts = iso2d(pose.pts, aspect)
         self.vis = pose.vis
 
-        # Scale. Turning sideways shrinks the visible shoulder width, so follow its
-        # upper envelope: quick to grow, slow to shrink.
-        sw_now = float(np.linalg.norm(self.pts[L_SHOULDER] - self.pts[R_SHOULDER]))
-        if self.sw is None:
-            self.sw = sw_now
-        else:
-            tau = cfg.sw_rise_s if sw_now > self.sw else cfg.sw_fall_s
-            self.sw += (sw_now - self.sw) * min(1.0, dt / tau)
-        self.sw = max(self.sw, 0.05)
+        # Scale. Turning sideways shrinks the visible shoulder width, so take a high
+        # percentile over a few seconds: a brief turn is ignored, and leaning in to the
+        # keyboard wears off in seconds (a slow-decay envelope kept it wrong for 20 s).
+        self.sw_window.push(t, float(np.linalg.norm(self.pts[L_SHOULDER] - self.pts[R_SHOULDER])))
+        self.sw = max(self.sw_window.percentile(cfg.sw_percentile), 0.05)
 
         # The aim uses the raw anchor: hand and chest come from the same frame, so their
         # difference is steady in a dodge, while a separately filtered chest would lag the

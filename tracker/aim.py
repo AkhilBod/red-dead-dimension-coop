@@ -1,4 +1,4 @@
-"""Raw aim (hand position in shoulder widths from the chest) -> screen coordinates."""
+"""Raw aim (hand position relative to the chest, in real metres) -> screen coordinates."""
 from collections import deque
 
 import numpy as np
@@ -76,10 +76,11 @@ class AimMapper:
     def _solve(self):
         """Least squares per axis: screen = gain * raw + offset.
 
-        The gain is clamped. Pointing naturally at a small screen moves the hand
-        only a few centimetres, and a gain that high turns landmark jitter into a
-        shaking crosshair. The offset (where this player's hand rests, which hand
-        they use) is the part of calibration that matters most.
+        The gain is clamped (aim_span_min/max are metres of hand travel per screen
+        width). Pointing naturally at a small screen moves the hand only a few
+        centimetres, and a gain that high turns landmark jitter into a shaking
+        crosshair. The offset (where this player's hand rests, which hand they use)
+        is the part of calibration that matters most.
         """
         cfg = self.cfg
         raws = np.array([p[0] for p in self.pairs])

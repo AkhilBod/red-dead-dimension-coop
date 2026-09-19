@@ -17,7 +17,7 @@ from pipeline import Pipeline  # noqa: E402
 
 ASPECT = 16 / 9
 SW = 0.27                   # shoulder width in image heights (player about 1.5 m away)
-M = SW / 0.38               # image heights per metre
+M = SW / 0.37               # image heights per metre (hand and body at the same depth)
 SHOULDER_Y = 0.45
 
 
@@ -47,18 +47,19 @@ def hand_model(thumb=0.0, open_palm=False):
     return p
 
 
-def make_hand(wrist_xy, thumb=0.0, pitch=0.0, open_palm=False):
-    """wrist_xy in image heights. pitch in radians, positive tips the finger up."""
+def make_hand(wrist_xy, thumb=0.0, pitch=0.0, open_palm=False, label="Right", zoom=1.0, score=0.95):
+    """wrist_xy in image heights. pitch in radians, positive tips the finger up.
+    zoom = how much nearer the camera the hand is than the body (2.6 = seated at a laptop)."""
     p = hand_model(thumb, open_palm)
     c, s = np.cos(pitch), np.sin(pitch)
     rot = p.copy()
     rot[:, 0] = p[:, 0] * c - p[:, 1] * s
     rot[:, 1] = p[:, 0] * s + p[:, 1] * c
     pts = np.zeros((21, 3))
-    pts[:, 0] = (wrist_xy[0] + rot[:, 0] * M) / ASPECT
-    pts[:, 1] = wrist_xy[1] - rot[:, 1] * M
-    pts[:, 2] = rot[:, 2] * M / ASPECT
-    return Hand(pts, rot - rot.mean(axis=0), "Right", 0.95)
+    pts[:, 0] = (wrist_xy[0] + rot[:, 0] * M * zoom) / ASPECT
+    pts[:, 1] = wrist_xy[1] - rot[:, 1] * M * zoom
+    pts[:, 2] = rot[:, 2] * M * zoom / ASPECT
+    return Hand(pts, rot - rot.mean(axis=0), label, score)
 
 
 def make_pose(center_x=0.5 * ASPECT, drop=0.0, wrists=None):

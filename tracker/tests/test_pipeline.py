@@ -31,12 +31,13 @@ class PipelineTests(unittest.TestCase):
         sim = Sim()
         wrist = rest_wrist()
         before = sim.run(1.0, lambda k: aiming(wrist))
-        pull_trigger(sim, wrist, flinch=(0.0, 0.15))
+        pull_trigger(sim, wrist, flinch=(0.0, 0.08))
+        flinched = sim.state
         sim.run(0.5, lambda k: aiming(wrist))
         fires = [e for _, e in sim.events if e[0] == "fire"]
         self.assertEqual(len(fires), 1)
         self.assertAlmostEqual(fires[0][1], before.aim_x, delta=0.02)
-        # The flinch moved the live crosshair about 0.19 of the screen. The shot must not follow it.
+        # The flinch (3 cm) moves the live crosshair a sixth of the screen. The shot must not follow it.
         self.assertAlmostEqual(fires[0][2], before.aim_y, delta=0.03)
 
     def test_second_shot_needs_the_thumb_to_come_back_up(self):
@@ -87,7 +88,7 @@ class PipelineTests(unittest.TestCase):
 
         def approach(k):
             off = start + (end - start) * k
-            return aiming(wrist, extra_hands=[make_hand(off - np.array([0.06, 0.0]), open_palm=True)], left_wrist=off)
+            return aiming(wrist, extra_hands=[make_hand(off - np.array([0.06, 0.0]), open_palm=True, label="Left")], left_wrist=off)
         sim.run(0.2, approach)
         # Contact: the off hand vanishes and the gun hand gets knocked upward.
         knocked = wrist + np.array([0.0, -0.15]) * SW
@@ -203,7 +204,7 @@ class PipelineTests(unittest.TestCase):
         wrist = rest_wrist()
         palm_wrist = np.array([CX - 0.9 * SW, SHOULDER_Y - 0.2 * SW])
         sim.run(0.5, lambda k: aiming(wrist))
-        shown = sim.run(0.4, lambda k: aiming(wrist, extra_hands=[make_hand(palm_wrist, open_palm=True)], left_wrist=palm_wrist))
+        shown = sim.run(0.4, lambda k: aiming(wrist, extra_hands=[make_hand(palm_wrist, open_palm=True, label="Left")], left_wrist=palm_wrist))
         self.assertEqual(shown.off_hand_open, 1.0)
         self.assertEqual(shown.aim_valid, 1.0)
         gone = sim.run(0.6, lambda k: aiming(wrist))
@@ -212,7 +213,7 @@ class PipelineTests(unittest.TestCase):
 
     def test_open_palm_alone_is_not_a_gun(self):
         sim = Sim()
-        state = sim.run(0.5, lambda k: ([make_hand(rest_wrist(), open_palm=True)], make_pose()))
+        state = sim.run(0.5, lambda k: ([make_hand(rest_wrist(), open_palm=True)], make_pose(wrists={"R": tuple(rest_wrist())})))
         self.assertEqual((state.aim_valid, state.gun_pose), (0.0, 0.0))
 
     def test_calibration_maps_pointing_positions_to_targets(self):
@@ -235,7 +236,7 @@ class PipelineTests(unittest.TestCase):
             self.assertAlmostEqual(state.aim_y, target[1], delta=0.04)
 
     def test_landmark_noise_causes_no_events_and_little_jitter(self):
-        sim = Sim(noise=0.002)
+        sim = Sim(noise=0.001)      # about 1.3 px at 720p, in line with what a recorded session showed
         wrist = rest_wrist()
         sim.run(1.0, lambda k: aiming(wrist))
         xs = []
@@ -251,6 +252,88 @@ class PipelineTests(unittest.TestCase):
         pull_trigger_no_body = lambda k: ([make_hand(rest_wrist(), thumb=k)], None)
         sim.run(0.1, pull_trigger_no_body)
         sim.run(0.2, lambda k: ([make_hand(rest_wrist(), thumb=1.0)], None))
+        self.assertEqual(sim.count("fire"), 1)
+
+
+class RecordedSessionRegressions(unittest.TestCase):
+    """Each of these is a bug found by replaying a recorded live session."""
+
+    def test_background_object_detected_as_a_hand_never_becomes_the_gun(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        phantom = lambda: make_hand(np.array([0.95 * ASPECT, 0.5]), zoom=0.35, label="Left", score=0.99)
+        sim.run(0.8, lambda k: ([make_hand(wrist), phantom()], make_pose(wrists={"R": tuple(wrist)})))
+        aimed = sim.state
+        # The real hand drops out for a second. The phantom is still there, with a higher score.
+        lost = sim.run(1.0, lambda k: ([phantom()], make_pose(wrists={"R": tuple(wrist)})))
+        self.assertEqual(lost.aim_valid, 0.0)
+        self.assertAlmostEqual(lost.aim_x, aimed.aim_x, delta=0.02)      # did not jump to the frame edge
+        self.assertEqual(sim.events, [])
+
+    def test_one_hand_reported_twice_is_one_hand(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        twice = lambda k: ([make_hand(wrist), make_hand(wrist + 0.004, label="Left", score=0.77)], make_pose(wrists={"R": tuple(wrist)}))
+        sim.run(1.0, twice)
+        self.assertIsNone(sim.pipeline.debug["off"])
+        self.assertEqual(sim.events, [])
+
+    def test_aim_gain_does_not_depend_on_how_near_the_camera_the_hand_is(self):
+        # Seated at a laptop the hand is ~2.6x nearer the camera than the chest, so it moves
+        # 2.6x further in the image. Ten real centimetres must still be ten centimetres.
+        moved = {}
+        for zoom in (1.0, 2.6):
+            sim = Sim()
+            centre = np.array([CX, 0.5])
+            a = centre + (rest_wrist() - centre)             # same image spot to start from
+            b = a + np.array([0.10 * synth.M * zoom, 0.0])   # 10 cm to the right at that depth
+            start = sim.run(0.8, lambda k: ([make_hand(a, zoom=zoom)], make_pose(wrists={"R": tuple(a)})))
+            end = sim.run(0.8, lambda k: ([make_hand(b, zoom=zoom)], make_pose(wrists={"R": tuple(b)})))
+            moved[zoom] = end.aim_x - start.aim_x
+        self.assertAlmostEqual(moved[1.0], 0.10 / Config().aim_span_x, delta=0.03)
+        self.assertAlmostEqual(moved[2.6], moved[1.0], delta=0.03)
+
+    def test_gun_lock_does_not_slide_onto_the_slapping_hand(self):
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        aimed = sim.state
+        # Slap: the other hand arrives underneath, then the GUN hand drops out of view and
+        # only the slapping hand is left, right where the gun was.
+        under = wrist + np.array([0.0, 0.25]) * SW
+        sim.run(0.3, lambda k: aiming(wrist, extra_hands=[make_hand(under, label="Left")], left_wrist=under))
+        sim.run(0.5, lambda k: ([make_hand(wrist, label="Left")], make_pose(wrists={"L": tuple(wrist), "R": tuple(wrist + np.array([0.0, 0.2]) * SW)})))
+        # Hands part. The slapping hand stays up on the far side, the gun arm is still down.
+        far = np.array([CX - 0.9 * SW, SHOULDER_Y - 0.1 * SW])
+        parted = sim.run(0.6, lambda k: ([make_hand(far, label="Left")], make_pose(wrists={"L": tuple(far)})))
+        self.assertEqual(parted.aim_valid, 0.0)             # not mirrored onto the other hand
+        back = sim.run(0.4, lambda k: aiming(wrist, extra_hands=[make_hand(far, label="Left")], left_wrist=far))
+        self.assertEqual(back.aim_valid, 1.0)
+        self.assertAlmostEqual(back.aim_x, aimed.aim_x, delta=0.03)
+        self.assertEqual(sim.count("fire"), 0)
+
+    def test_slap_where_only_the_slapping_hand_is_visible(self):
+        # Seated: the gun hand sinks below the frame and the camera only sees the other hand kick.
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        low = np.array([CX + 0.1 * SW, SHOULDER_Y + 0.5 * SW])
+        together = {"L": tuple(low), "R": tuple(low + np.array([0.15, 0.1]) * SW)}
+        sim.run(0.5, lambda k: ([make_hand(low, label="Left")], make_pose(wrists=together)))
+        sim.run(0.1, lambda k: ([make_hand(low, pitch=0.5 * k, label="Left")], make_pose(wrists=together)))
+        sim.run(0.3, lambda k: ([make_hand(low, pitch=0.5 * (1 - k), label="Left")], make_pose(wrists=together)))
+        self.assertEqual(sim.count("reload"), 1)
+        self.assertEqual(sim.count("fire"), 0)
+
+    def test_slow_relaxed_recoil_still_fires(self):
+        # The recorded recoils took 0.25 s to rise, not the 0.1 s snap first assumed.
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        up = wrist + np.array([0.0, -0.2]) * SW
+        sim.run(0.25, lambda k: aiming(wrist + (up - wrist) * k, pitch=0.5 * k))
+        sim.run(0.4, lambda k: aiming(up + (wrist - up) * k, pitch=0.5 * (1 - k)))
+        sim.run(0.4, lambda k: aiming(wrist))
         self.assertEqual(sim.count("fire"), 1)
 
 

@@ -57,6 +57,12 @@ class DebugView:
             sy = int(body.stand_y * h)
             cv2.line(img, (w - 18, sy), (w, sy), GRAY, 2)
 
+        for hand in pipeline.ignored:
+            pts = [(int(p[0] * w), int(p[1] * h)) for p in hand.pts]
+            for a, b in HAND_EDGES:
+                cv2.line(img, pts[a], pts[b], (60, 60, 160), 1, cv2.LINE_AA)
+            cv2.putText(img, "ignored", (pts[0][0] + 8, pts[0][1] + 16), FONT, 0.45, (60, 60, 200), 1, cv2.LINE_AA)
+
         for info in dbg.get("infos", []):
             color = GREEN if info is dbg.get("gun") else ORANGE
             pts = [(int(p[0] * w), int(p[1] * h)) for p in info.hand.pts]
@@ -91,7 +97,7 @@ class DebugView:
 
         for x0, y0, x1, y1 in ((0, 0, 520, 60), (0, 60, 320, 240), (0, h - 30, w, h)):
             img[y0:y1, x0:x1] = (img[y0:y1, x0:x1] * 0.35).astype(np.uint8)     # dark backing so text reads over video
-        cv2.putText(img, f"{fps:4.1f} fps  {ms:4.1f} ms   side {'R' if dbg.get('side', 1) > 0 else 'L'}   "
+        cv2.putText(img, f"{fps:4.1f} fps  {ms:4.1f} ms   gun arm {dbg.get('gun_arm') or '?'}   "
                          f"{'calibrated' if pipeline.mapper.calibrated else 'default aim map'}"
                          f"{'   REC' if recording else ''}", (12, 22), FONT, 0.55, WHITE, 1, cv2.LINE_AA)
         flags = [("TRACK", state.tracking), ("GUN", state.gun_pose), ("AIM", state.aim_valid),
@@ -102,17 +108,22 @@ class DebugView:
             x += 22 + 11 * len(name)
 
         thumb, flick, reload_ = pipeline.thumb, pipeline.flick, pipeline.reload
-        fire_level, rearm_level = thumb.levels()
         has_gun = dbg.get("gun") is not None
-        self._bar(img, 0, "thumb", thumb.f if has_gun else None, 0.0, 1.4,
-                  marks=((fire_level, RED), (rearm_level, GREEN)), color=GREEN if thumb.armed else GRAY)
-        self._bar(img, 1, "flick", flick.rise if has_gun else None, -0.3, 0.5,
-                  marks=((cfg.flick_rise, RED),), color=GREEN if (flick.armed and cfg.flick_enabled) else GRAY)
-        self._bar(img, 2, "slap d", reload_.d, 0.0, 2.0, marks=((cfg.slap_near, RED),),
-                  color=RED if reload_.fire_suppressed(frame.t) else GREEN)
-        self._bar(img, 3, "lean", state.lean, -1.0, 1.0)
-        self._bar(img, 4, "duck", state.duck, 0.0, 1.0)
-        self._bar(img, 5, "speed", state.body_speed, 0.0, 1.0)
+        steady = dbg.get("steady", False)
+        marks = [(cfg.thumb_min_cocked, GREEN)]
+        if thumb.peak:
+            marks.append((thumb.peak * (1.0 - cfg.thumb_drop_frac), RED))
+        self._bar(img, 0, "thumb", thumb.f if (has_gun and thumb.f is not None) else None, 0.0, 1.2, marks=marks,
+                  color=GREEN if (thumb.armed and steady) else GRAY)       # gray = frozen (hand moving) or waiting to re-arm
+        self._bar(img, 1, "kick m", flick.rise if has_gun else None, -0.02, 0.15,
+                  marks=((cfg.flick_rise_m, RED),), color=GREEN if flick.armed else GRAY)
+        self._bar(img, 2, "hand v", pipeline.hand_speed if has_gun else None, 0.0, 1.0, marks=((cfg.thumb_max_speed, RED),))
+        rel = reload_.relation
+        self._bar(img, 3, "hands dx", None if rel is None else float(rel[0]), -2.0, 2.0,
+                  marks=((-cfg.slap_together_dx, YELLOW), (cfg.slap_together_dx, YELLOW)),
+                  color=YELLOW if reload_.together(frame.t) else GREEN)     # yellow = hands together: a kick now is a reload
+        self._bar(img, 4, "lean", state.lean, -1.0, 1.0)
+        self._bar(img, 5, "duck", state.duck, 0.0, 1.0)
 
         if frame.t < self.flash[1]:
             cv2.putText(img, self.flash[0], (w // 2 - 80, 70), cv2.FONT_HERSHEY_DUPLEX, 1.5, YELLOW, 3, cv2.LINE_AA)

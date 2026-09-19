@@ -7,10 +7,11 @@ import numpy as np
 import protocol as P
 from aim import AimHistory, AimMapper
 from body import BodyTracker
-from hand_features import INDEX_MCP, INDEX_TIP, PALM, WRIST, extensions, is_gun_pose, is_open_palm, iso2d, thumb_feature
+from hand_features import HAND_LENGTH_M, INDEX_MCP, INDEX_TIP, PALM, WRIST, image_scale, is_open_palm, iso2d, thumb_feature
 from one_euro import OneEuro
 from reload import ReloadDetector
 from trigger import FlickTrigger, ThumbTrigger
+from windows import TimedWindow
 
 
 @dataclass
@@ -19,13 +20,19 @@ class HandInfo:
     p2: np.ndarray          # (21, 2) in H units
     wrist: np.ndarray
     center: np.ndarray
-    gun: bool
-    open: bool
-    raised: bool
+    scale: float            # H per metre at this hand's depth, this frame
+    length: float           # the hand's length in the image, H
+    arm: str = None         # which arm of the body model it hangs off, "L" / "R" / None
+    open: bool = False
+    raised: bool = False
 
 
 def _dist(a, b):
     return float(np.linalg.norm(a - b))
+
+
+def _other(arm):
+    return "R" if arm == "L" else "L"
 
 
 class Pipeline:
@@ -35,17 +42,23 @@ class Pipeline:
         self.mapper = AimMapper(cfg)
         self.history = AimHistory()
         self.aim_filter = OneEuro(cfg.aim_min_cutoff, cfg.aim_beta)
+        self.gun_scale = TimedWindow(cfg.hand_scale_window_s)
         self.thumb = ThumbTrigger(cfg)
         self.flick = FlickTrigger(cfg)
+        self.off_flick = FlickTrigger(cfg)      # the other hand's kicks only ever mean "reload"
         self.reload = ReloadDetector(cfg)
         self.aim = (0.5, 0.5)
         self.gun_pos = None
+        self.gun_center = None
         self.gun_seen_t = -1e9
-        self.chain = None           # which arm of the body model holds the gun, "L" or "R"
-        self.chain_votes = 0
-        self.side = 1               # +1 if that arm is on the right of the mirrored image
+        self.hand_speed = 0.0       # m/s
+        self.gun_arm = None         # which arm holds the gun. Sticky: it is who the player is, not where a hand is
+        self.arm_votes = 0
+        self.other_arm_since = None
+        self.side = 1               # +1 if the gun arm is on the right of the mirrored image
         self.last_fire_t = -1e9
-        self.held_shot = None       # (release time, raw aim) while we wait to see if it was a slap
+        self.last_fire_kind = None
+        self.pending_kick = None    # (decide-by time, raw aim): a kick that may yet turn out to be a slap
         self.gun_pose = False
         self.gun_pose_frames = 0
         self.gun_pose_true_t = -1e9
@@ -53,6 +66,7 @@ class Pipeline:
         self.off_open_since = None
         self.off_open_true_t = -1e9
         self.down_since = None
+        self.ignored = []           # detections judged not to be the player's hands, for the debug view
         self.debug = {}
 
     def handle_command(self, address, args):
@@ -64,56 +78,125 @@ class Pipeline:
         elif address == P.ADDR_RECENTER:
             self.body.recenter()
 
-    def _emit_fire(self, events, raw):
-        x, y = self.mapper.map(raw, self.side)
-        self.mapper.add_shot(raw)
-        events.append(("fire", x, y))
+    # ---- which detections are the player's hands --------------------------------
+
+    def _arm_of(self, h):
+        best = None
+        for arm in ("L", "R"):
+            w = self.body.wrist(arm, 0.3)
+            if w is not None:
+                d = _dist(w, h.wrist)
+                if d <= self.cfg.hand_arm_match * h.length and (best is None or d < best[1]):
+                    best = (arm, d)
+        return best[0] if best else None
+
+    def _hands(self, frame, chest_scale, holster_y):
+        """[rec] A background object came back as a 0.99-confidence hand a third the size of the
+        real one and stole the aim whenever the real hand dropped out. A booth full of spectators
+        will do the same. A hand only counts if it could physically be the player's."""
+        cfg, body = self.cfg, self.body
+        infos, self.ignored = [], []
+        for hand in sorted(frame.hands, key=lambda h: -h.score):
+            p2 = iso2d(hand.pts, frame.aspect)
+            scale = image_scale(p2)
+            h = HandInfo(hand, p2, p2[WRIST], p2[list(PALM)].mean(axis=0), scale, HAND_LENGTH_M * scale)
+            if body.visible:
+                h.arm = self._arm_of(h)
+                # Farther from the camera than the player's own chest, or not on either arm
+                # and not clearly held out in front: not the player's hand.
+                if scale < cfg.hand_min_scale_ratio * chest_scale or (h.arm is None and scale < cfg.hand_free_scale_ratio * chest_scale):
+                    self.ignored.append(hand)
+                    continue
+            # The hand model sometimes reports one hand twice. Keep the more confident one.
+            if any(_dist(h.center, k.center) < cfg.hand_dedupe * max(h.length, k.length) for k in infos):
+                self.ignored.append(hand)
+                continue
+            h.open = is_open_palm(hand, p2, scale, cfg)
+            h.raised = bool(h.wrist[1] < holster_y)
+            infos.append(h)
+        return infos
 
     def _drop_gun_lock(self):
         self.gun_pos = None
+        self.gun_center = None
+        self.hand_speed = 0.0
         self.aim_filter.reset()
         self.history.clear()
+        self.gun_scale.clear()
         self.thumb.reset()
         self.flick.reset()
+        self.pending_kick = None
 
-    def _pick_gun(self, infos, t, sw):
+    def _pick_gun(self, infos, t):
+        """[rec] During reload slaps the hands overlap, and a lock held by position alone slid
+        onto the slapping hand and mirrored the aim. The model's Left/Right labels flip with
+        hand orientation, so identity comes from the body model instead: the gun is the hand
+        on the gun ARM."""
         cfg = self.cfg
+        hands_apart = not self.reload.together(t)
         raised = [h for h in infos if h.raised]
+        if self.gun_arm is not None and hands_apart:
+            mine = [h for h in raised if h.arm != _other(self.gun_arm)]
+        else:
+            mine = raised           # arms cannot be told apart while the wrists touch
         if self.gun_pos is not None:
             if t - self.gun_seen_t > cfg.gun_unlock_s:
                 self._drop_gun_lock()
             else:
-                near = [h for h in raised if _dist(h.wrist, self.gun_pos) < cfg.gun_lock_radius * sw]
-                if not near:
-                    return None
-                return min(near, key=lambda h: (not h.gun, _dist(h.wrist, self.gun_pos)))
-        candidates = [h for h in raised if not h.open]
-        if not candidates:
+                near = [h for h in mine if _dist(h.wrist, self.gun_pos) < cfg.gun_lock_jump * h.length]
+                return min(near, key=lambda h: _dist(h.wrist, self.gun_pos)) if near else None
+        candidates = [h for h in mine if not h.open]
+        if candidates:
+            self.other_arm_since = None
+            # The hand nearest the camera is the one held out toward the screen.
+            return max(candidates, key=lambda h: h.scale)
+        # Only the other arm's hand is up. If it stays that way, the player switched hands.
+        others = [h for h in raised if not h.open] if hands_apart else []
+        if not others:
+            self.other_arm_since = None
             return None
-        return min(candidates, key=lambda h: (not h.gun, h.wrist[1]))
+        if self.other_arm_since is None:
+            self.other_arm_since = t
+        if t - self.other_arm_since >= cfg.hand_switch_s:
+            self.gun_arm, self.arm_votes, self.other_arm_since = others[0].arm, 0, None
+            return max(others, key=lambda h: h.scale)
+        return None
 
-    def _update_side(self, gun, anchor, sw, fresh):
+    def _learn_gun_arm(self, gun, anchor, fresh):
         body = self.body
-        best = None
-        for chain in ("L", "R"):
-            w = body.wrist(chain, 0.4)
-            if w is not None:
-                d = _dist(w, gun.wrist)
-                if d < 0.6 * sw and (best is None or d < best[1]):
-                    best = (chain, d)
-        if best is not None:
-            if best[0] == self.chain:
-                self.chain_votes = 0
-            else:
-                self.chain_votes += 1
-                if self.chain is None or self.chain_votes >= 8:
-                    self.chain, self.chain_votes = best[0], 0
-        if self.chain is not None and body.visible:
-            self.side = 1 if body.shoulder(self.chain)[0] >= anchor[0] else -1
-        elif self.chain is None and fresh:
+        if self.gun_arm is None and gun.arm is not None:
+            self.arm_votes += 1
+            if self.arm_votes >= 5:
+                self.gun_arm = gun.arm
+        if self.gun_arm is not None and body.visible:
+            self.side = 1 if body.shoulder(self.gun_arm)[0] >= anchor[0] else -1
+        elif self.gun_arm is None and fresh:
             # No arm matched yet. Guess once per lock: re-guessing every frame would
             # flip the crosshair whenever the hand crossed the midline.
             self.side = 1 if gun.wrist[0] >= anchor[0] else -1
+
+    # ---- events -------------------------------------------------------------------
+
+    def _fire(self, events, t, raw, kind):
+        cfg = self.cfg
+        since = t - self.last_fire_t
+        if since < cfg.fire_cooldown_s or self.reload.fire_suppressed(t):
+            return
+        if kind != self.last_fire_kind and since < cfg.other_trigger_lockout_s:
+            return                  # thumb drop followed by its own recoil kick: one shot
+        x, y = self.mapper.map(raw, self.side)
+        self.mapper.add_shot(raw)
+        events.append(("fire", x, y))
+        self.last_fire_t, self.last_fire_kind = t, kind
+
+    def _reload(self, events, t):
+        self.pending_kick = None
+        if self.reload.can_reload(t):
+            self.reload.mark_reload(t)
+            events.append(("reload",))
+
+    def _rewound(self, t, onset):
+        return self.history.at(max(onset - self.cfg.rewind_margin_s, t - self.cfg.rewind_max_s))
 
     def update(self, frame):
         cfg, body = self.cfg, self.body
@@ -127,64 +210,80 @@ class Pipeline:
         else:
             anchor = aim_anchor = np.array([0.5 * aspect, 0.55])
             sw, holster_y = cfg.fallback_sw, 0.85
+        chest_scale = sw / cfg.shoulder_width_m
 
-        infos = []
-        for hand in frame.hands:
-            p2 = iso2d(hand.pts, aspect)
-            ext = extensions(hand, aspect)
-            infos.append(HandInfo(hand, p2, p2[WRIST], p2[list(PALM)].mean(axis=0),
-                                  is_gun_pose(ext, cfg), is_open_palm(ext, cfg), p2[WRIST][1] < holster_y))
-
+        infos = self._hands(frame, chest_scale, holster_y)
         had_lock = self.gun_pos is not None
-        gun = self._pick_gun(infos, t, sw)
-        off = next((h for h in infos if h is not gun), None) if gun is not None else None
+        gun = self._pick_gun(infos, t)
+        off = next((h for h in infos if h is not gun), None)
 
-        onset = None
+        # Where the two hands are relative to each other. The hand model if it sees both,
+        # otherwise the body model's wrists, which survive overlap and the frame edge better.
+        relation = None
+        if gun is not None and off is not None:
+            relation = (off.center - gun.wrist) / sw
+        elif body.visible:
+            wl, wr = body.wrist("L"), body.wrist("R")
+            if wl is not None and wr is not None:
+                relation = (wr - wl) / sw
+        self.reload.observe(t, relation)
+
+        steady = False
         if gun is not None:
             fresh = not had_lock or self.gun_pos is None
             if fresh:
                 self._drop_gun_lock()      # start filters and triggers clean
-            self._update_side(gun, anchor, sw, fresh)
+            self._learn_gun_arm(gun, anchor, fresh)
+
+            # Hand travel in real metres: divide by the hand's OWN image scale. The hand is
+            # much nearer the camera than the chest, so chest-scaled motion is magnified
+            # 2-3x and the crosshair becomes unusably twitchy (seen live).
+            self.gun_scale.push(t, gun.scale)
+            scale = self.gun_scale.median()
+            centre = np.array([0.5 * aspect, 0.5])
             point = (1.0 - cfg.aim_tip_weight) * gun.p2[INDEX_MCP] + cfg.aim_tip_weight * gun.p2[INDEX_TIP]
-            raw = self.aim_filter((point - aim_anchor) / sw, t)
+            raw = self.aim_filter((point - centre) / scale - (aim_anchor - centre) / chest_scale, t)
             self.history.push(t, raw)
             self.aim = self.mapper.map(raw, self.side)
-            self.gun_pos, self.gun_seen_t = gun.wrist, t
 
-            f = thumb_feature(gun.hand, aspect)
-            if f is not None:
-                onset = self.thumb.update(t, f)
-            flick_onset = self.flick.update(t, (gun.p2[WRIST][1] - gun.p2[INDEX_TIP][1]) / sw)
-            if cfg.flick_enabled and flick_onset is not None:
-                onset = flick_onset if onset is None else min(onset, flick_onset)
+            if self.gun_center is not None and t > self.gun_seen_t:
+                v = _dist(gun.center, self.gun_center) / (t - self.gun_seen_t) / scale
+                self.hand_speed += (v - self.hand_speed) * 0.5
+            self.gun_pos, self.gun_center, self.gun_seen_t = gun.wrist, gun.center, t
 
-        # Reload runs before the fire decision so a slap can veto the shot it causes.
-        pose_gun = pose_off = None
-        if self.chain is not None and body.visible:
-            pose_gun = body.wrist(self.chain)
-            pose_off = body.wrist("R" if self.chain == "L" else "L")
-        recently_armed = t - self.gun_seen_t < 1.0
-        if self.reload.update(t, gun.wrist if gun else None, off.center if off else None, pose_gun, pose_off, sw) and recently_armed:
-            events.append(("reload",))
-            self.held_shot = None           # that "shot" was the slap knocking the hand
+            kick_onset = self.flick.update(t, (gun.p2[WRIST][1] - gun.p2[INDEX_TIP][1]) / scale)
+            steady = self.hand_speed < cfg.thumb_max_speed and self.flick.swing(cfg.thumb_swing_s) < cfg.thumb_max_swing
+            thumb_onset = self.thumb.update(t, thumb_feature(gun.hand), steady)
 
-        if onset is not None and t - self.last_fire_t >= cfg.fire_cooldown_s and not self.reload.fire_suppressed(t):
-            raw_then = self.history.at(max(onset - cfg.rewind_margin_s, t - cfg.rewind_max_s))
-            self.last_fire_t = t
-            # The slap's knock can look like a trigger pull a few frames BEFORE the reload is
-            # recognised. If the other hand is close, wait a moment before committing to the
-            # shot. With the other hand out of the way (the normal case) nothing is delayed.
-            near = [p for p in (off.center if off else None, pose_off) if p is not None]
-            if gun is not None and any(_dist(p, gun.wrist) < cfg.fire_hold_radius * sw for p in near):
-                self.held_shot = (t + cfg.fire_hold_s, raw_then)
-            else:
-                self._emit_fire(events, raw_then)
-        if self.held_shot is not None and t >= self.held_shot[0]:
-            self._emit_fire(events, self.held_shot[1])
-            self.held_shot = None
+            if kick_onset is not None:
+                if self.reload.together(t):
+                    self._reload(events, t)
+                elif cfg.flick_enabled:
+                    if self.reload.maybe_together(t):
+                        self.pending_kick = (t + cfg.slap_decide_s, self._rewound(t, kick_onset))
+                    else:
+                        self._fire(events, t, self._rewound(t, kick_onset), "flick")
+            if thumb_onset is not None:
+                self._fire(events, t, self._rewound(t, thumb_onset), "thumb")
+
+        if off is not None:
+            off_kick = self.off_flick.update(t, (off.p2[WRIST][1] - off.p2[INDEX_TIP][1]) / off.scale)
+            if off_kick is not None and self.reload.together(t):
+                self._reload(events, t)
+
+        if self.pending_kick is not None:
+            if self.reload.together(t):
+                self._reload(events, t)
+            elif t >= self.pending_kick[0]:
+                raw_then, self.pending_kick = self.pending_kick[1], None
+                self._fire(events, t, raw_then, "flick")
+
+        scale_now = self.gun_scale.median() if self.gun_scale.buf else chest_scale
+        if self.reload.approach(t, gun.wrist if gun else None, off.center if (gun and off) else None, scale_now, sw):
+            self._reload(events, t)
 
         # Debounced flags.
-        if gun is not None and gun.gun:
+        if gun is not None and not gun.open:
             self.gun_pose_frames += 1
             self.gun_pose_true_t = t
         else:
@@ -206,12 +305,13 @@ class Pipeline:
             if t - self.off_open_true_t > cfg.offhand_off_s:
                 self.off_open = False
 
-        # Holstered = nothing raised. The body model's wrist backs up the hand
+        # Holstered = the gun arm is down. The body model's wrist backs up the hand
         # model, so a hand-tracking dropout while aiming does not read as a holster.
-        up = any(h.raised for h in infos)
+        off_arm = _other(self.gun_arm) if self.gun_arm else None
+        up = gun is not None or any(h.raised and h.arm != off_arm for h in infos)
         if not up and body.visible:
-            for chain in ((self.chain,) if self.chain else ("L", "R")):
-                w = body.wrist(chain, 0.6)
+            for arm in ((self.gun_arm,) if self.gun_arm else ("L", "R")):
+                w = body.wrist(arm, 0.6)
                 if w is not None and w[1] < holster_y - 0.05 * sw:
                     up = True
         if up:
@@ -223,7 +323,8 @@ class Pipeline:
 
         self.debug = {
             "infos": infos, "gun": gun, "off": off, "anchor": anchor, "sw": sw, "holster_y": holster_y,
-            "body_visible": body.visible, "side": self.side, "chain": self.chain,
+            "body_visible": body.visible, "side": self.side, "gun_arm": self.gun_arm, "steady": steady,
+            "rejected": len(frame.hands) - len(infos),
         }
         state = P.State(
             aim_x=self.aim[0], aim_y=self.aim[1],
