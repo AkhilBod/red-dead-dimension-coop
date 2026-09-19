@@ -134,6 +134,7 @@ class MB:
         self.mats = []
         self.xf = None
         self.mirror = False
+        self.warp = None
         self.default_w = None
 
     def gi(self, bone):
@@ -152,6 +153,8 @@ class MB:
             co = self.xf @ co
         if self.mirror:
             co.x = -co.x
+        if self.warp is not None:
+            co = self.warp(co)
         v = self.bm.verts.new(co)
         w = w or self.default_w
         if w:
@@ -253,6 +256,10 @@ class MB:
         bm = self.bm
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.normal_update()
+        for f in bm.faces:          # faces tagged as ground must face up whatever the recalculation decided
+            if f.tag and f.normal.z < 0:
+                f.normal_flip()
         for f in bm.faces:
             f.smooth = smooth
         me = bpy.data.meshes.new(self.name)

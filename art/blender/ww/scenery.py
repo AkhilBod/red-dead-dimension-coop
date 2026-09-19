@@ -76,7 +76,7 @@ def buffer_stop(mb):
     mb.box((0, -0.26, 1.25), (2.5, 0.03, 0.12), "paint_white")
 
 
-def telegraph_span(mb, span=30.0, seed=2):
+def telegraph_span(mb, span=30.0, seed=2, wires=True):
     """One pole plus the wires reaching the next pole `span` metres further along +Y. Instance every `span`."""
     rng = random.Random(seed)
     cyl(mb, (0, 0, -0.3), (0.05, 0, 7.2), 0.13, "deadwood", n=6, r2=0.09)
@@ -84,6 +84,8 @@ def telegraph_span(mb, span=30.0, seed=2):
         mb.box((0.04, 0, z), (w, 0.12, 0.12), "plank_dark")
         for x in (-w / 2 + 0.15, -w / 6, w / 6, w / 2 - 0.15):
             cyl(mb, (x + 0.04, 0, z + 0.06), (x + 0.04, 0, z + 0.20), 0.035, "bottle_green", n=6)
+            if not wires:
+                continue
             pts = []
             for i in range(9):
                 t = i / 8

@@ -38,6 +38,7 @@ def shot(path, target=(0, 0, 1.0), dist=4.5, yaw=25.0, pitch=8.0, ortho=None, re
     else:
         cam.data.type = "PERSP"
         cam.data.lens = 60
+    cam.data.clip_start, cam.data.clip_end = 0.5, 20000.0
     sc.camera = cam
     sc.render.engine = "BLENDER_WORKBENCH"
     sh = sc.display.shading
