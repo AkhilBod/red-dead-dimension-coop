@@ -57,7 +57,7 @@ webcam -> tracker (Python, MediaPipe landmarks + our signal processing)
 Unreal -> OSC port 7001 -> tracker (calibration, recenter)
 ```
 
-- Tracker is Python, not a browser tab: a background browser tab gets throttled when Unreal has focus, and Python runs on CPU so Unreal keeps the GPU.
+- Tracker is Python, not a browser tab: a background browser tab gets throttled when Unreal has focus. On Windows the tracker runs on CPU, so Unreal keeps the GPU (on a Mac it has to use the GPU).
 - Unreal uses the built-in **OSC plugin**. Blueprint only, no C++ needed.
 - The tracker can run on the same machine (`127.0.0.1`) or on a second laptop (`--host <unreal machine ip>`) over a phone hotspot if the Unreal laptop is struggling.
 - **The game is always playable with mouse and keyboard.** `BP_TrackerInput` has a mouse mode. Lohith never needs a camera to build the game.
@@ -90,6 +90,7 @@ Game to tracker, port 7001 (optional, tracker has sane defaults without it):
 
 `/fg/calib/begin` start calibration, reset stance baseline.
 `/fg/calib/target` `[sx, sy]` the player is about to shoot a target at this screen position. Tracker pairs it with the next fire. During calibration the game counts *any* `/fg/fire` as a hit on the current bottle.
+**Hide the crosshair during calibration.** The player should point at the bottle naturally, not steer a cursor onto it. The crosshair appears after the last bottle, already lined up with how they point.
 `/fg/recenter` current position becomes neutral lean and standing height.
 
 Mouse mode mapping (Unreal side and `fake_tracker.py`): mouse = aim, LMB = fire, R = reload, A/D = lean, S = duck, H = holster, F = Focus.
@@ -98,15 +99,17 @@ Mouse mode mapping (Unreal side and `fake_tracker.py`): mouse = aim, LMB = fire,
 
 ### AKHIL: the tracker (`tracker/`, Python)
 
-Environment already verified on the Mac: Python 3.12 venv, `mediapipe 1.0.1` (Tasks API only, needs the `.task` model files), `opencv-python`, `python-osc`, `numpy`.
+**Status: v1 of all of this is in [tracker/](tracker/), see [tracker/README.md](tracker/README.md).** 25 synthetic tests pass, real models verified on sample photos at ~6 ms/frame on the Mac. Not yet done: steps 9 and 10, and every threshold is still a first guess until it is tuned on real hands with the checklist in the README.
+
+Found on the way: `mediapipe 1.x` crashes on its CPU path on macOS, so the tracker uses the GPU delegate there. Lean and duck come from the shoulders rather than the head, because the gun hand covers the face from the camera's view. The neutral stance is learned the first time the player stands still, so nobody has to stand dead center.
 
 1. **Hour 1, unblocks everyone:** push `fake_tracker.py` (mouse and keys in an OpenCV window, sends the exact OSC above) and `osc_monitor.py` (prints whatever arrives on 7000). Jason builds against the fake.
 2. **Landmarks.** Webcam 1280x720, HandLandmarker (2 hands) + PoseLandmarker lite, debug window with skeleton and FPS. Test standing 4-5 ft back. Target 25+ FPS.
 3. **Aim.** Hand position relative to the shoulder midpoint, scaled by shoulder width, so leaning does not drag the crosshair. Use the knuckle more than the fingertip: a finger pointed straight at the camera is the worst case for hand tracking. One Euro filter. Default mapping works with no calibration. Send `/fg/state`.
 4. **Trigger.** Thumb drop (thumb-tip distance normalized by palm size, hysteresis + velocity threshold) and recoil flick (upward velocity spike from rest). Shared 250ms cooldown. Aim history ring buffer, rewind to gesture onset. Send `/fg/fire`. Pass mark: 18 of 20 deliberate shots register, zero fire while just aiming.
 5. **Reload slap.** Off-hand approaches the gun wrist *from below*, fast. Hands overlapping makes MediaPipe drop a hand, so treat "fast approach then one hand vanishes" as contact, and fall back to pose wrists. Send `/fg/reload`.
-6. **Body.** Lean from head X, duck from head Y against an auto-captured standing baseline, holster from wrist vs hip line, open-palm detect on the off hand.
-7. **Calibration handshake** on port 7001: collect 4 (raw aim, screen target) pairs, solve an affine map by least squares. `/fg/recenter`.
+6. **Body.** Lean from chest X, duck from chest Y against an auto-captured standing baseline, holster from wrist vs hip line, open-palm detect on the off hand.
+7. **Calibration handshake** on port 7001: collect 4 (raw aim, screen target) pairs, least-squares fit per axis with a clamped gain (natural pointing at a small screen would otherwise make the crosshair twitchy). `/fg/recenter`.
 8. **Tuning tools.** Record landmarks to a file and replay them through the detectors, so thresholds get tuned without standing at the camera. Live bars in the debug window showing each feature against its threshold.
 9. Test on the actual demo machine (Windows) and in remote `--host` mode. Tune on strangers, not on us.
 10. Write the one-page No Wrapper explainer with a diagram.
@@ -161,7 +164,7 @@ Build everything against `BP_TrackerInput` in mouse mode. Until Jason hands it o
 ## 7. What we tell No Wrapper judges
 
 1. **A camera-only trigger that feels instant.** Two fused gestures, hysteresis and velocity thresholds on scale-normalized landmarks, and the aim is rewound to the onset of the gesture so pulling the trigger does not throw the shot.
-2. **Dodging that does not wreck your aim.** Aim is measured relative to your shoulders, filtered with a One Euro filter, and calibrated with a least-squares affine fit from four shots.
+2. **Dodging that does not wreck your aim.** Aim is measured relative to your shoulders, filtered with a One Euro filter, and calibrated with a least-squares fit from four shots.
 3. **Reload detection that survives tracking failure.** Two overlapping hands break the hand model, so contact is inferred from approach velocity plus the disappearance itself.
 4. **A real-time bridge into a game engine.** 30Hz OSC state, event messages, latency budget measured on camera.
 5. Game side: attack-token director that guarantees every shot is dodgeable.
