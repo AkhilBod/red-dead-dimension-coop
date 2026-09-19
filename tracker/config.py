@@ -47,8 +47,19 @@ class Config:
     aim_push_max_speed: float = 1.2     # m/s. Faster than this is a tracking jump, not a hand held past the screen edge
     calib_gain_min: float = 0.5         # calibration may scale the sensitivity by this much, no more
     calib_gain_max: float = 2.0
-    aim_min_cutoff: float = 0.8         # One Euro: lower = steadier, heavier. A gun has weight
-    aim_beta: float = 4.0               # One Euro: higher = less lag in fast moves (speeds here are m/s)
+    # [rec] Measured on two recorded sessions against a zero-lag reference. With 0.8 / 4.0 the crosshair
+    # trailed a moving hand by 3.5-4% of the screen, and 6-7% behind where the hand really was by the time
+    # the frame arrived (~45 ms of camera delay). 1.0 / 20 with a quicker speed estimate halves that, and
+    # the jitter of a hand at rest is unchanged (0.8-1.0 mm a frame either way): the cutoff only opens up
+    # while the hand is actually travelling.
+    aim_min_cutoff: float = 1.0         # One Euro: lower = steadier at rest
+    aim_beta: float = 20.0              # One Euro: higher = less lag in fast moves (speeds here are m/s)
+    aim_d_cutoff: float = 3.0           # One Euro: how quickly the speed estimate itself reacts
+    # Look ahead along the hand's velocity to cancel the camera delay. Only while it is moving: at rest
+    # a lead would just multiply jitter. [rec] 30 ms took the moving error from 4-5% to 2.6-3.6%; more overshoots.
+    aim_lead_s: float = 0.03
+    aim_lead_from: float = 0.08         # m/s. No lead below this...
+    aim_lead_full: float = 0.35         # ...all of it above this
     aim_hold_s: float = 0.25            # keep the crosshair alive through short dropouts
     hand_scale_window_s: float = 0.7    # median window for the hand's image scale
     gun_lock_jump: float = 1.5          # hand lengths the gun hand may jump between frames and stay "the gun"
@@ -92,6 +103,10 @@ class Config:
     rewind_margin_s: float = 0.04       # a gesture is only detectable once under way: skip back past its first frames...
     rewind_window_s: float = 0.15       # ...and take the median aim over this stretch, where the hand was still held on target
     rewind_max_s: float = 0.6
+    # [rec] Rewinding to a median is right for a hand held on target, and wrong for one sweeping across
+    # the screen: shots fired while moving landed 12-14% of the screen BEHIND the crosshair. A hand moving
+    # faster than this before the trigger gets a straight-line fit instead, read at the trigger moment.
+    rewind_still_speed: float = 0.12    # m/s
     trigger_gap_reset_s: float = 0.25
 
     # --- Reload slap ---------------------------------------------------------

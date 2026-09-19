@@ -347,6 +347,20 @@ class GloveButtonTests(unittest.TestCase):
         self.assertAlmostEqual(fires[0][1], held.aim_x, delta=0.02)
         self.assertAlmostEqual(fires[0][2], held.aim_y, delta=0.03)
 
+    def test_button_shot_from_a_sweeping_hand_lands_on_the_crosshair_not_behind_it(self):
+        # Seen live: click while tracking a moving target and the hit mark trailed the crosshair.
+        sim = Sim()
+        wrist = rest_wrist()
+        sim.run(1.0, lambda k: aiming(wrist))
+        sweep = np.array([0.6, 0.0]) * SW
+        shown = sim.run(0.3, lambda k: aiming(wrist + sweep * k * 0.5))
+        sim.pipeline.press_button(sim.t)
+        sim.run(0.3, lambda k: aiming(wrist + sweep * (0.5 + k * 0.5)))
+        fires = [e for _, e in sim.events if e[0] == "fire"]
+        self.assertEqual(len(fires), 1)
+        self.assertGreater(abs(shown.aim_x - 0.5), 0.1)                 # the sweep really moved the crosshair
+        self.assertAlmostEqual(fires[0][1], shown.aim_x, delta=0.015)
+
     def test_button_under_the_thumb_is_one_shot_not_two(self):
         # The switch sits where the thumb lands, so pressing it is also a thumb-drop gesture.
         sim = Sim()

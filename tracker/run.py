@@ -31,7 +31,7 @@ LOW_FPS = 20
 class Camera:
     """Grabs on its own thread so the tracker always gets the newest frame, never a queued one."""
 
-    def __init__(self, index, width, height):
+    def __init__(self, index, width, height, fps=60):
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
         self.cap = cv2.VideoCapture(index, backend)
         if not self.cap.isOpened() and sys.platform == "darwin":
@@ -48,12 +48,14 @@ class Camera:
             self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))   # 720p30 needs MJPG on most webcams
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.cap.isOpened():
             raise SystemExit(f"could not open camera {index}. Try --camera 1 and close other apps using it. On macOS: "
                              "System Settings > Privacy & Security > Camera, turn on the app you launched this from "
                              "(Terminal, iTerm, Claude, VS Code...), then run again.")
+        print(f"[camera] {int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))}x{int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))} "
+              f"at {self.cap.get(cv2.CAP_PROP_FPS):.0f} fps (asked for {fps})")
         self.lock = threading.Condition()
         self.frame = None
         self.seq = 0
@@ -279,6 +281,8 @@ def main():
     ap.add_argument("--camera", type=int, default=0)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
+    ap.add_argument("--fps", type=int, default=60, help="camera frame rate to ask for. More = fresher frames = less lag. "
+                    "Cameras that cannot do it just give what they have")
     ap.add_argument("--pose-every", type=int, default=1, help="run the body model at most every Nth frame")
     ap.add_argument("--delegate", choices=("cpu", "gpu"), default="cpu", help="gpu is experimental, see landmarks.py")
     ap.add_argument("--arduino", default="auto", help="glove serial port, e.g. /dev/cu.usbmodem1101 or COM5. auto = find it, off = no glove")
@@ -294,7 +298,7 @@ def main():
     cfg = Config()
     cfg.apply_overrides(args.set)
     # The camera is opened here, on the main thread: macOS can only show its permission prompt from it.
-    camera = None if args.replay else Camera(args.camera, args.width, args.height)
+    camera = None if args.replay else Camera(args.camera, args.width, args.height, args.fps)
     tracker = Tracker(args, cfg, camera)
     tracker.start()
 

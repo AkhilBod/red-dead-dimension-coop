@@ -5,10 +5,21 @@ import numpy as np
 import synth  # noqa: F401  (puts the tracker folder on sys.path)
 
 import protocol as P
-from aim import AimMapper
+from aim import AimHistory, AimMapper
 from config import Config
 from landmarks import Frame, frame_from_json, frame_to_json
 from one_euro import OneEuro
+
+
+class AimHistoryTests(unittest.TestCase):
+    def test_held_aim_rewinds_to_the_median_and_a_sweep_to_the_line(self):
+        held, sweep = AimHistory(), AimHistory()
+        for i in range(12):
+            t = i / 30
+            held.push(t, [0.10 + (0.03 if i == 8 else 0.0), 0.0])      # one glitch frame
+            sweep.push(t, [0.5 * t, 0.0])                                # 0.5 m/s
+        self.assertAlmostEqual(held.settled_before(0.36, 0.15, 0.12, read_at=0.40)[0], 0.10, places=6)
+        self.assertAlmostEqual(sweep.settled_before(0.36, 0.15, 0.12, read_at=0.40)[0], 0.20, places=6)
 
 
 class OneEuroTests(unittest.TestCase):

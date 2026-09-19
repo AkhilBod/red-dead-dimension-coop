@@ -27,17 +27,26 @@ class AimHistory:
                 return raw
         return self.buf[0][1]
 
-    def settled_before(self, time, window):
-        """Median aim over the `window` seconds ending at `time`.
+    def settled_before(self, time, window, still_speed=None, read_at=None):
+        """Aim over the `window` seconds ending at `time`.
 
         A trigger gesture is only recognisable once it is under way, so its detected
         onset is already a few frames into the motion and a single sample there is
-        already off target. The player held their aim BEFORE that, so use that stretch.
+        already off target. The player held their aim BEFORE that, so use that stretch:
+        its median if the hand was held still, and if it was sweeping across the screen,
+        the straight line through it read at `read_at`, so the shot is not left behind.
         """
-        pts = [raw for t, raw in self.buf if time - window <= t <= time]
+        pts = [(t, raw) for t, raw in self.buf if time - window <= t <= time]
         if len(pts) < 2:
             return self.at(time)
-        return np.median(np.array(pts), axis=0)
+        ts = np.array([p[0] for p in pts])
+        xs = np.array([p[1] for p in pts])
+        if still_speed is None or len(pts) < 3 or np.ptp(ts) < 1e-3:
+            return np.median(xs, axis=0)
+        slope, icpt = np.polyfit(ts - ts[-1], xs, 1)
+        if np.linalg.norm(slope) < still_speed:
+            return np.median(xs, axis=0)
+        return icpt + slope * ((time if read_at is None else read_at) - ts[-1])
 
 
 class AimMapper:

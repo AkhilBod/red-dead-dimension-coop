@@ -41,7 +41,7 @@ class Pipeline:
         self.body = BodyTracker(cfg)
         self.mapper = AimMapper(cfg)
         self.history = AimHistory()
-        self.aim_filter = OneEuro(cfg.aim_min_cutoff, cfg.aim_beta)
+        self.aim_filter = OneEuro(cfg.aim_min_cutoff, cfg.aim_beta, cfg.aim_d_cutoff)
         self.gun_scale = TimedWindow(cfg.hand_scale_window_s)
         self.thumb = ThumbTrigger(cfg)
         self.flick = FlickTrigger(cfg)
@@ -206,7 +206,16 @@ class Pipeline:
 
     def _rewound(self, t, onset):
         cfg = self.cfg
-        return self.history.settled_before(max(onset - cfg.rewind_margin_s, t - cfg.rewind_max_s), cfg.rewind_window_s)
+        onset = max(onset, t - cfg.rewind_max_s)
+        return self.history.settled_before(onset - cfg.rewind_margin_s, cfg.rewind_window_s, cfg.rewind_still_speed, read_at=onset)
+
+    def _lead(self, raw):
+        """Where the hand is by now, not where the camera saw it a frame or two ago."""
+        cfg, v = self.cfg, self.aim_filter.dx
+        if v is None or cfg.aim_lead_s <= 0:
+            return raw
+        g = float(np.clip((np.linalg.norm(v) - cfg.aim_lead_from) / (cfg.aim_lead_full - cfg.aim_lead_from), 0.0, 1.0))
+        return raw + cfg.aim_lead_s * g * g * (3 - 2 * g) * v
 
     def update(self, frame):
         cfg, body = self.cfg, self.body
@@ -262,7 +271,7 @@ class Pipeline:
             tip = gun.p2[INDEX_TIP]
             if self.ref_tip is None:
                 self.ref_tip, self.ref_chest = tip.copy(), aim_anchor.copy()
-            raw = self.aim_filter((tip - self.ref_tip) / scale - (aim_anchor - self.ref_chest) / chest_scale, t)
+            raw = self._lead(self.aim_filter((tip - self.ref_tip) / scale - (aim_anchor - self.ref_chest) / chest_scale, t))
             self.history.push(t, raw)
 
             if self.gun_center is not None and t > self.gun_seen_t:
@@ -316,11 +325,13 @@ class Pipeline:
                 self._fire(events, t, self._rewound(t, thumb_onset), "thumb")
 
         # The glove's switch. It sits under the thumb, so pressing it is also a thumb drop:
-        # the lockout between different triggers makes that one shot. Like the gestures, the
-        # press jolts the hand, so the shot goes where the aim was held just before it.
+        # the lockout between different triggers makes that one shot. Unlike a gesture, a click
+        # has an exact time and the jolt comes AFTER it, so there is nothing to rewind past:
+        # the shot goes exactly where the crosshair was when the switch closed. Seen live:
+        # rewinding it left the hit marks trailing behind the crosshair of a moving hand.
         for t_press in self.button_presses:
             if self.history.buf and t - self.gun_seen_t < 1.0:
-                self._fire(events, t, self._rewound(t, t_press), "button")
+                self._fire(events, t, self.history.at(t_press - 1e-3), "button")     # the last frame from strictly before the click
         self.button_presses = []
 
         if off is not None:

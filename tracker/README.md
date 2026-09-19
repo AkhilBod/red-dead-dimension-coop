@@ -34,6 +34,7 @@ Stand 4 to 5 ft back with your shoulders in frame. Light your face and hands.
 | `--host 10.0.0.5` | Unreal is on another machine |
 | `--camera 1` | pick another webcam |
 | `--no-window` | no tuning window. **Run the demo machine like this** |
+| `--fps 30` | camera frame rate to ask for. Default 60: fresher frames, less lag. A camera that cannot do it gives what it has, and the start-up line says what you got |
 | `--pose-every 2` | cap the body model at every 2nd frame (it already backs off by itself on a busy machine) |
 | `--record` | save landmarks to `recordings/` |
 | `--replay file.jsonl` | run the detectors over a recording, no camera |
