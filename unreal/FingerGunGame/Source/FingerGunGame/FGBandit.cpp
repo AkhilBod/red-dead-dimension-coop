@@ -1,6 +1,7 @@
 #include "FGBandit.h"
 
 #include "Animation/AnimSequence.h"
+#include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "FGAssets.h"
@@ -38,6 +39,17 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
     Side = Spec.Slot.Y >= 0.0f ? 1.0f : -1.0f;
     Local = Spec.Slot;
     Timer = Spec.FirstShotDelay;
+    SetActorScale3D(FVector(Spec.Scale));
+
+    WarnLight = NewObject<UPointLightComponent>(this);
+    WarnLight->SetMobility(EComponentMobility::Movable);
+    WarnLight->SetupAttachment(Body, Body->DoesSocketExist(TEXT("muzzle_r")) ? FName(TEXT("muzzle_r")) : NAME_None);
+    WarnLight->SetIntensityUnits(ELightUnits::Candelas);
+    WarnLight->SetIntensity(0.0f);
+    WarnLight->SetLightColor(FLinearColor(1.0f, 0.04f, 0.02f));
+    WarnLight->SetAttenuationRadius(900.0f);
+    WarnLight->SetCastShadows(false);
+    WarnLight->RegisterComponent();
 
     switch (Spec.Kind)
     {
@@ -130,6 +142,14 @@ void AFGBandit::AimPoints(FVector& OutChest, FVector& OutHead) const
     OutChest = bBones ? Body->GetSocketLocation(TEXT("spine_02")) : Body->GetComponentLocation() + FVector(0, 0, 115.0f * Scale);
 }
 
+float AFGBandit::Warning() const
+{
+    if (bIsDead) { return 0.0f; }
+    if (State == EFGBanditState::Telegraph && !bShotThisTelegraph) { return FMath::Clamp(StateTime / TelegraphSeconds, 0.02f, 1.0f); }
+    if (State == EFGBanditState::Scripted && DrawTimer > 0.0f) { return FMath::Clamp(1.0f - DrawTimer, 0.02f, 1.0f); }
+    return 0.0f;
+}
+
 void AFGBandit::Leave()
 {
     if (State != EFGBanditState::Dead)
@@ -163,6 +183,11 @@ void AFGBandit::Tick(float DeltaTime)
     StateTime += DeltaTime;
     Age += DeltaTime;
     const bool bRider = Spec.Kind == EFGBanditKind::Rider;
+
+    // Red flash at the barrel, quicker as the shot gets nearer.
+    const float Warn = Warning();
+    const bool bBlinkOn = Warn > 0.0f && FMath::Fmod(Age * (5.0f + 9.0f * Warn), 1.0f) < 0.55f;
+    WarnLight->SetIntensity(bBlinkOn ? 2500.0f : 0.0f);
 
     if (State == EFGBanditState::Dead)
     {
@@ -299,7 +324,7 @@ void AFGBandit::Tick(float DeltaTime)
     if (bRider && Horse)
     {
         // art/README.md: rider root sits 90 cm under the saddle bone. Done in world space: the bone's own axes are Blender's.
-        Body->SetWorldLocation(Horse->GetSocketLocation(TEXT("saddle")) - FVector(0.0f, 0.0f, 90.0f));
+        Body->SetWorldLocation(Horse->GetSocketLocation(TEXT("saddle")) - FVector(0.0f, 0.0f, 90.0f * Spec.Scale));
     }
     if (Cover)
     {

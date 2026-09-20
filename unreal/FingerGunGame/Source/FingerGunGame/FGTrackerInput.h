@@ -58,6 +58,13 @@ public:
     void SendCalibBegin();
     void SendCalibTarget(float ScreenX, float ScreenY);
     void SendRecenter();
+    void SendAimMode(bool bFinger);
+
+    /** Space: the player has moved or the camera got bumped. Here and now becomes neutral stance and screen centre. */
+    void Recenter();
+
+    bool bFingerMode = false;       // P toggles: crosshair sits on the fingertip in the camera picture
+    double RecenteredAt = -1000.0;
 
     UPROPERTY(Transient)
     TObjectPtr<UTexture2D> CameraTexture;

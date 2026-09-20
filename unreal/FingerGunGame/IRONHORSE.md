@@ -17,12 +17,10 @@ Everything is C++ in `Source/FingerGunGame/FG*.cpp`, built on the existing class
 
 Art: `Scripts/import_art.py` imports `art/export/*.fbx` from the tracker repo into `/Game/IronHorse` (headless, see the docstring). `Scripts/make_audio.py` + `import_audio.py` make the placeholder sounds. `Scripts/make_level.py` makes the level.
 
+Keys while playing: **Space** recentres (stance and aim: use it when the player or the camera has moved), **P** switches the tracker between aim-from-a-learned-centre and crosshair-on-the-fingertip. `Scripts/fix_materials.py` makes every imported material two-sided (the scenery is open shells).
+
 Test switches on the command line: `-FGAuto` (plays itself), `-FGGod`, `-FGShots=4` (screenshot every 4 s to `Saved/Screenshots`), `-FGSkip=95` (jump to 95 s into the ride).
 
 Build with the editor closed. If any Unreal window is open, the build writes `-0001` hot-reload copies and the game keeps loading the old module.
 
 Changed existing files: `FingerGunGame.Build.cs` (socket, image, json modules), `Config/DefaultEngine.ini` (startup and default map).
-
-## This copy (in the tracker repo)
-
-`Content/Characters` (the 126 MB template mannequins) is left out. The Iron Horse level does not use it; the First Person template Blueprints will warn about it if opened. First use on a new machine: open `FingerGunGame.uproject` and let it rebuild the module. Art re-imports from `../../art/export` with `Scripts/import_art.py` if `Content/IronHorse` ever needs regenerating.

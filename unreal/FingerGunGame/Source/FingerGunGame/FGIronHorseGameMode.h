@@ -84,6 +84,7 @@ public:
     float TrainSpeed = 0.0f;                // m/s
     FString Rank() const;
     float Accuracy() const;
+    const TArray<TObjectPtr<AFGBandit>>& AllBandits() const { return Bandits; }
     static FBox2D RideAgainButton() { return FBox2D(FVector2D(0.36, 0.76), FVector2D(0.64, 0.88)); }
 
     UPROPERTY()
@@ -133,6 +134,7 @@ private:
     int32 CansLeft = 0;
     int32 SpawnCount = 0;
     bool bQueuedTunnel = false;
+    bool bInTunnel = false;
     bool bQueuedSideTrack = false;
     bool bBanditTrainCrewed = false;
     // showdown

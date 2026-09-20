@@ -21,6 +21,7 @@ struct FFGBanditSpec
     float FirstShotDelay = 2.0f;
     float Health = 25.0f;
     int32 HorseCoat = 0;
+    float Scale = 1.0f;
 };
 
 /**
@@ -50,6 +51,10 @@ public:
 
     float Play(const FString& Action, bool bLoop = false, float Rate = 1.0f);
 
+    /** 0 when calm, 0..1 through the 0.7 s before a shot. The barrel flashes red and the HUD marks it. */
+    float Warning() const;
+    FVector MuzzleLocation() const;
+
     FFGBanditSpec Spec;
     EFGBanditState State = EFGBanditState::Entering;
     bool bHeadshot = false;
@@ -62,6 +67,9 @@ public:
 
     UPROPERTY()
     TObjectPtr<UStaticMeshComponent> Cover;
+
+    UPROPERTY()
+    TObjectPtr<class UPointLightComponent> WarnLight;
 
 private:
     TWeakObjectPtr<AFGIronHorseGameMode> Game;
@@ -79,6 +87,5 @@ private:
     FTransform AnchorTransform() const;
     void SetState(EFGBanditState NewState);
     void FireAtPlayer(bool bFast);
-    FVector MuzzleLocation() const;
     void FacePlayer();
 };

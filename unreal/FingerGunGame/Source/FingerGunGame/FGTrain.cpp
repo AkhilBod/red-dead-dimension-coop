@@ -2,7 +2,9 @@
 
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimSingleNodeInstance.h"
+#include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "FGAssets.h"
 #include "FGWorldStreamer.h"
 
@@ -52,6 +54,20 @@ void AFGTrain::Build(const TArray<FString>& CarNames, int32 ReferenceIndex, bool
         {
             Comp->PlayAnimation(Roll, true);
             Comp->SetPlayRate(0.0f);
+        }
+        if (USkeletalMesh* Mesh = Comp->GetSkeletalMeshAsset())
+        {
+            // The imported cars have no physics asset, so nothing could collide with them. One box each is plenty.
+            const FBoxSphereBounds B = Mesh->GetBounds();
+            UBoxComponent* Box = NewObject<UBoxComponent>(this);
+            Box->SetupAttachment(Comp);
+            Box->SetRelativeLocation(B.Origin);
+            Box->SetBoxExtent(B.BoxExtent);
+            Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            Box->SetCollisionResponseToAllChannels(ECR_Ignore);
+            Box->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
+            Box->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+            Box->RegisterComponent();
         }
         Car.Comp = Comp;
         CarComps.Add(Comp);

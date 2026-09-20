@@ -6,6 +6,7 @@
 
 class UFGTrackerInput;
 class USkeletalMeshComponent;
+class USpringArmComponent;
 class AFGIronHorseGameMode;
 
 /**
@@ -26,8 +27,15 @@ public:
     UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
     TObjectPtr<UFGTrackerInput> Tracker;
 
+    /** Pivot at the standing eye. The duck is its socket offset, swept against the train, so the view can never end up inside a car. */
+    UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
+    TObjectPtr<USpringArmComponent> CameraArm;
+
     UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
     TObjectPtr<USkeletalMeshComponent> Revolver;
+
+    /** How far the eye drops at a full duck, cm. Roof walkway to eye is 160 standing; the roof's own clutter reaches ~50. */
+    float DuckDropCm = 55.0f;
 
     FVector HeadLocation() const;
 

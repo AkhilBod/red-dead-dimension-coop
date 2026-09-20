@@ -4,7 +4,9 @@
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "FGBandit.h"
 #include "FGIronHorseGameMode.h"
+#include "GameFramework/PlayerController.h"
 #include "FGTrackerInput.h"
 #include "FGTrainPlayer.h"
 #include "UObject/ConstructorHelpers.h"
@@ -166,6 +168,21 @@ void AFGHud::DrawHUD()
             Box(P.X - S / 2, P.Y - S / 2, S, S, bLoaded ? Brass : FLinearColor(0, 0, 0, 0.55f));
         }
 
+        // ---- incoming shot: a red marker on the barrel that is about to fire, closing in as the 0.7 s run out
+        if (APlayerController* PC = GetOwningPlayerController())
+        {
+            for (const AFGBandit* B : GM->AllBandits())
+            {
+                const float Warn = B ? B->Warning() : 0.0f;
+                FVector2D At;
+                if (Warn <= 0.0f || !PC->ProjectWorldLocationToScreen(B->MuzzleLocation(), At)) { continue; }
+                const bool bOn = FMath::Fmod(Now * (5.0f + 9.0f * Warn), 1.0f) < 0.55f;
+                const FLinearColor Red(1.0f, 0.05f, 0.03f, bOn ? 1.0f : 0.35f);
+                Ring(At, (70.0f - 48.0f * Warn) * U, 5 * U, Red, 24);
+                Box(At.X - 7 * U, At.Y - 7 * U, 14 * U, 14 * U, Red);
+            }
+        }
+
         // ---- crosshair
         const bool bShow = GM->bCrosshairVisible && Tracker->State.bAimValid && !GM->bPlayerDead;
         if (bShow)
@@ -202,6 +219,14 @@ void AFGHud::DrawHUD()
     Box(CX + 4 * U, CY + CH + 9 * U, 14 * U, 14 * U, Dot);
     Text(Tracker->bTrackerLive ? TEXT("WEBCAM TRACKER") : TEXT("MOUSE MODE   LMB fire  R reload  A/D lean  S duck  H holster"), CX + 26 * U, CY + CH + 6 * U, Tracker->bTrackerLive ? 15 : 10, Cream, false, false);
 
+    if (Tracker->bTrackerLive)
+    {
+        Text(Tracker->bFingerMode ? TEXT("SPACE recenter    P aim: ON FINGER") : TEXT("SPACE recenter    P aim: from centre"), CX + CW + 18 * U, CY + CH + 6 * U, 13, Cream, false);
+    }
+    if (FPlatformTime::Seconds() - Tracker->RecenteredAt < 1.2)
+    {
+        Text(TEXT("RECENTERED"), W * 0.5f, H * 0.62f, 44, Brass);
+    }
     if (Tracker->NoPersonSeconds > 1.0f)
     {
         Box(0, H * 0.42f, W, H * 0.16f, FLinearColor(0, 0, 0, 0.6f));

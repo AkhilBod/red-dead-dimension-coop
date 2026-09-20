@@ -89,7 +89,7 @@ void AFGIronHorseGameMode::BeginPlay()
     // Two people playing a webcam game on a laptop: spend the GPU on frame rate, not on ray tracing.
     if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
     {
-        for (const TCHAR* Cmd : { TEXT("r.Lumen.HardwareRayTracing 0"), TEXT("r.RayTracing.Shadows 0"), TEXT("r.MotionBlurQuality 2"), TEXT("r.VolumetricFog 0"), TEXT("r.Shadow.Virtual.Enable 0"), TEXT("DisableAllScreenMessages"), TEXT("t.MaxFPS 60") })
+        for (const TCHAR* Cmd : { TEXT("r.Lumen.HardwareRayTracing 0"), TEXT("r.RayTracing.Shadows 0"), TEXT("r.MotionBlurQuality 2"), TEXT("r.VolumetricFog 0"), TEXT("r.Shadow.Virtual.Enable 0"), TEXT("r.SetNearClipPlane 4"), TEXT("DisableAllScreenMessages"), TEXT("t.MaxFPS 60") })
         {
             PC->ConsoleCommand(Cmd);
         }
@@ -484,6 +484,14 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
     SpawnTimer -= DeltaTime;
     const bool bNarrow = World->MetresTo(TEXT("narrow")) == 0.0f || World->MetresTo(TEXT("dark")) == 0.0f || World->MetresTo(TEXT("trestle")) == 0.0f;
 
+    // Tunnels are a ducking section, nothing else: nobody new shows up from 150 m out, and whoever is still
+    // around clears off at the mouth. A bandit cannot ride or climb aboard inside a tunnel anyway.
+    const float ToDark = World->MetresTo(TEXT("dark"));
+    const bool bTunnelNear = ToDark >= 0.0f && ToDark < 150.0f;
+    if (ToDark == 0.0f && !bInTunnel) { EveryoneLeave(); }
+    bInTunnel = ToDark == 0.0f;
+    if (bTunnelNear) { SpawnTimer = FMath::Max(SpawnTimer, 1.5f); }
+
     // The line ahead is laid 600 m out, so set pieces are ordered about 25 s before they are needed.
     if (!bQueuedTunnel && RideTime > 44.0f)
     {
@@ -509,7 +517,8 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
             FFGBanditSpec Spec;
             Spec.Kind = EFGBanditKind::Rider;
             const float Side = SpawnCount % 2 ? -1.0f : 1.0f;
-            Spec.Slot = FVector(FMath::FRandRange(2600.0f, 4200.0f), Side * FMath::FRandRange(700.0f, 1000.0f), 0.0f);
+            Spec.Slot = FVector(FMath::FRandRange(2400.0f, 3800.0f), Side * FMath::FRandRange(620.0f, 880.0f), 0.0f);
+            Spec.Scale = 1.35f;        // out to the side they read small. Bigger and closer.
             Spec.Mesh = SpawnCount % 5 == 4 ? TEXT("SK_Gunslinger") : (SpawnCount % 3 == 2 ? TEXT("SK_Deputy") : TEXT("SK_Bandit"));
             Spec.HorseCoat = SpawnCount;
             Spec.FirstShotDelay = FMath::FRandRange(1.5f, 3.0f);
@@ -842,14 +851,7 @@ void AFGIronHorseGameMode::ReleaseAttackToken()
 
 void AFGIronHorseGameMode::OnTelegraph(AFGBandit* Bandit)
 {
-    // Glint and a rising tone: 0.7 s of warning before every shot.
-    FVector Chest, Head;
-    Bandit->AimPoints(Chest, Head);
-    if (AFGFx* Glint = AFGFx::Spawn(GetWorld(), TEXT("fx"), TEXT("SM_MuzzleFlash_B"), FTransform(FRotator::ZeroRotator, Chest + FVector(0, 0, 25), FVector(0.15f)), 0.7f, FVector::ZeroVector, 3.0f))
-    {
-        Glint->AttachToActor(Bandit, FAttachmentTransformRules::KeepWorldTransform);
-        Glint->AddLight(FLinearColor(1.0f, 0.9f, 0.6f), 250.0f, 600.0f);
-    }
+    // The bandit flashes red at the barrel for the 0.7 s (AFGBandit::Warning). Here: the rising tone.
     PlaySfx(TEXT("telegraph"), 0.8f);
 }
 

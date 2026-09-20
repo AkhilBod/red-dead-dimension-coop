@@ -8,10 +8,23 @@
 #include "FGIronHorseGameMode.h"
 #include "FGTrackerInput.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 
 AFGTrainPlayer::AFGTrainPlayer()
 {
     Tracker = CreateDefaultSubobject<UFGTrackerInput>(TEXT("Tracker"));
+
+    CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
+    CameraArm->SetupAttachment(GetCapsuleComponent());
+    CameraArm->SetRelativeLocation(FVector(0.0f, 0.0f, StandingCameraZ));
+    CameraArm->TargetArmLength = 1.0f;          // zero would switch the collision sweep off
+    CameraArm->bDoCollisionTest = true;
+    CameraArm->ProbeSize = 14.0f;
+    CameraArm->ProbeChannel = ECC_Camera;
+    CameraArm->bUsePawnControlRotation = false;
+    CameraArm->bEnableCameraLag = false;
+    FirstPersonCamera->SetupAttachment(CameraArm, USpringArmComponent::SocketName);
+    FirstPersonCamera->SetRelativeLocation(FVector::ZeroVector);
 
     Revolver = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Revolver"));
     Revolver->SetupAttachment(FirstPersonCamera);
@@ -24,7 +37,10 @@ AFGTrainPlayer::AFGTrainPlayer()
 
     // PLAN.md: lean is about a metre sideways, a duck about 0.8 m down.
     LeanDistance = 100.0f;
-    CrouchedCameraZ = -16.0f;
+    // The base class ducks by moving the camera on the capsule AND shrinking the capsule, which lowers the whole actor:
+    // 128 cm in all, which put the view inside the car. Both are neutralised here and the arm does the duck instead.
+    StandingCameraZ = 0.0f;
+    CrouchedCameraZ = 0.0f;
     CrosshairScreenMargin = 0.0f;   // the tracker's 0..1 already means the whole screen
     bDrawShotDebug = false;
     AutoPossessPlayer = EAutoReceiveInput::Disabled;
@@ -33,6 +49,7 @@ AFGTrainPlayer::AFGTrainPlayer()
 void AFGTrainPlayer::BeginPlay()
 {
     Super::BeginPlay();
+    CrouchedCapsuleHalfHeight = StandingCapsuleHalfHeight;
     Revolver->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("fx"), TEXT("SK_PlayerRevolver")));
     PlayGun(TEXT("fp_idle"), true);
     Tracker->OnFire.AddUObject(this, &AFGTrainPlayer::HandleFire);
@@ -74,6 +91,7 @@ void AFGTrainPlayer::Tick(float DeltaTime)
     SetBodyInput(In.Lean, 1.0f - In.Duck);
     SetAimNormalized(In.AimX * 2.0f - 1.0f, 1.0f - In.AimY * 2.0f);
     Super::Tick(DeltaTime);
+    CameraArm->SocketOffset = FVector(0.0f, 0.0f, -DuckDropCm * In.Duck);
 
     HitFlash = FMath::Max(0.0f, HitFlash - DeltaTime * 1.2f);
     Recoil = FMath::FInterpTo(Recoil, 0.0f, DeltaTime, 9.0f);

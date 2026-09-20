@@ -176,6 +176,7 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
     Mesh->SetStaticMesh(FGAssets::StaticMesh(TEXT("chunks"), TEXT("SM_") + Def->Name));
     Mesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+    Mesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);    // a gantry passing at 26 m/s must not shove the camera arm
     Mesh->SetupAttachment(ChainRoot);
     Mesh->SetRelativeTransform(Placed.Start);
     Mesh->RegisterComponent();

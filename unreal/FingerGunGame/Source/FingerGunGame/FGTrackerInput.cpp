@@ -127,6 +127,15 @@ void UFGTrackerInput::TickMouse(float DeltaTime)
             OnFire.Broadcast(FVector2D(MX / W, MY / H));
         }
     }
+    if (PC->WasInputKeyJustPressed(EKeys::SpaceBar))
+    {
+        Recenter();
+    }
+    if (PC->WasInputKeyJustPressed(EKeys::P))
+    {
+        bFingerMode = !bFingerMode;
+        SendAimMode(bFingerMode);
+    }
     if (PC->WasInputKeyJustPressed(EKeys::R))
     {
         OnReload.Broadcast();
@@ -355,3 +364,14 @@ void UFGTrackerInput::SendOsc(const char* Address, const TArray<float>& Args)
 void UFGTrackerInput::SendCalibBegin() { SendOsc("/fg/calib/begin", {}); }
 void UFGTrackerInput::SendCalibTarget(float X, float Y) { SendOsc("/fg/calib/target", { X, Y }); }
 void UFGTrackerInput::SendRecenter() { SendOsc("/fg/recenter", {}); }
+void UFGTrackerInput::SendAimMode(bool bFinger) { SendOsc("/fg/aim_mode", { bFinger ? 1.0f : 0.0f }); }
+
+void UFGTrackerInput::Recenter()
+{
+    SendRecenter();
+    State.Lean = Raw.Lean = 0.0f;
+    State.Duck = Raw.Duck = 0.0f;
+    State.AimX = Raw.AimX = 0.5f;
+    State.AimY = Raw.AimY = 0.5f;
+    RecenteredAt = FPlatformTime::Seconds();
+}
