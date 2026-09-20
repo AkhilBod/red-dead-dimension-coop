@@ -371,11 +371,12 @@ class GloveButtonTests(unittest.TestCase):
         sim.run(0.3, lambda k: aiming(wrist, thumb=1.0))
         self.assertEqual(sim.count("fire"), 1)
 
-    def test_button_respects_the_fire_rate_and_needs_a_gun_hand(self):
+    def test_button_respects_the_fire_rate_and_works_without_a_tracked_hand(self):
         sim = Sim()
-        sim.pipeline.press_button(sim.t)                     # nobody is aiming
+        sim.pipeline.press_button(sim.t)                     # no hand seen: a glove can hide it from the hand model
         sim.run(0.5, lambda k: ([], make_pose()))
-        self.assertEqual(sim.count("fire"), 0)
+        self.assertEqual(sim.count("fire"), 1)               # it still shoots, at the last crosshair
+        sim.events.clear()
         wrist = rest_wrist()
         sim.run(1.0, lambda k: aiming(wrist))
         for _ in range(3):                                   # switch bounce / mashing inside one frame

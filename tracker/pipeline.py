@@ -411,6 +411,11 @@ class Pipeline:
         for t_press in self.button_presses:
             if self.history.buf and t - self.gun_seen_t < 1.0:
                 self._fire(events, t, self.history.at(t_press - 1e-3), "button")     # the last frame from strictly before the click
+            elif t - self.last_fire_t >= cfg.fire_cooldown_s:
+                # No tracked hand (a glove can hide it from the hand model, or it is out of frame): the switch still
+                # shoots, wherever the crosshair was last. A trigger that does nothing reads as broken hardware.
+                events.append(("fire", self.aim[0], self.aim[1], "button"))
+                self.last_fire_t, self.last_fire_kind = t, "button"
         self.button_presses = []
 
         if off is not None:

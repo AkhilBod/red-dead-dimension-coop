@@ -15,6 +15,7 @@ ADDR_STATE2 = "/fg/state2"            # second gun: [aimX, aimY, valid, primaryI
 ADDR_CALIB_BEGIN = "/fg/calib/begin"
 ADDR_CALIB_TARGET = "/fg/calib/target"
 ADDR_RECENTER = "/fg/recenter"
+ADDR_HIT = "/fg/hit"                  # the player just lost a hat: the glove buzzes its "hit" pattern
 ADDR_AIM_MODE = "/fg/aim_mode"        # [1.0] = pointer on the fingertip, [0.0] = travel from a learned centre
 
 

@@ -155,7 +155,7 @@ class Config:
     # shoulders do, and a duck tucks it down between them. So how far the head has moved RELATIVE to the chest is
     # added on top of the chest's own travel. The face is often hidden behind the gun hand, so this fades in and out
     # with how well the face is seen (never a jump), and with no face at all it is the old shoulders-only reading.
-    head_weight: float = 0.7            # how much of the head's extra sideways travel counts towards lean
+    head_weight: float = 1.0            # how much of the head's extra sideways travel counts towards lean
     # [rec] Much less for the duck: looking down at the screen tucks the head just like a duck does, and at 0.7 a seated
     # player read as ducking 42% of the time instead of 15%.
     head_weight_duck: float = 0.2

@@ -18,7 +18,7 @@ import cv2
 import protocol as P
 from config import Config
 from debug_view import DebugView, capture
-from glove import FIRE, RELOAD, Glove
+from glove import FIRE, HIT, RELOAD, Glove
 from landmarks import Landmarker, frame_from_json, frame_to_json
 from osc_io import OscIn, OscOut
 from pipeline import Pipeline
@@ -221,9 +221,14 @@ class Tracker(threading.Thread):
                         break
                 for address, cmd_args in self.osc_in.poll():
                     print(f"[osc in] {address} {cmd_args}")
+                    if address == P.ADDR_HIT:
+                        if glove:
+                            glove.send(HIT)
+                        continue
                     pipeline.handle_command(address, cmd_args)
                 if glove:
                     for t_press in glove.poll():
+                        print("[glove] trigger pressed")
                         pipeline.press_button(t_press)
                 state, events = pipeline.update(frame)
                 self.calib.update(pipeline)
