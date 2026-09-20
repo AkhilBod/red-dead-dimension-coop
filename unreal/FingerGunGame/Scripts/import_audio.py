@@ -8,8 +8,9 @@ for f in sorted(glob.glob(SRC + "/*.wav")):
     t.automated, t.save, t.replace_existing = True, True, True
     tasks.append(t)
 unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
-loop = unreal.load_asset("/Game/IronHorse/audio/train_loop")
-if loop:
-    loop.set_editor_property("looping", True)
-    unreal.EditorAssetLibrary.save_loaded_asset(loop)
+for name in ("train_loop", "music_day", "music_night", "music_boss"):
+    loop = unreal.load_asset("/Game/IronHorse/audio/" + name)
+    if loop:
+        loop.set_editor_property("looping", True)
+        unreal.EditorAssetLibrary.save_loaded_asset(loop)
 unreal.log("IRONHORSE AUDIO DONE")

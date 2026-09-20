@@ -143,6 +143,10 @@ private:
     TObjectPtr<UAudioComponent> TrainLoop;
 
     UPROPERTY()
+    TObjectPtr<UAudioComponent> Music[3];       // day, night, boss: all running, crossfaded by volume
+    float MusicLevel[3] = { 0.0f, 0.0f, 0.0f };
+
+    UPROPERTY()
     TObjectPtr<UPointLightComponent> Lantern;
 
     TArray<FFGEnemyShot> Shots;

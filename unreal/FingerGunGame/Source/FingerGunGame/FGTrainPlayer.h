@@ -8,6 +8,22 @@ class UFGTrackerInput;
 class USkeletalMeshComponent;
 class USpringArmComponent;
 class AFGIronHorseGameMode;
+class UStaticMeshComponent;
+
+/** One gun per lap. Same finger gun, same thumb trigger: only what comes out of the barrel changes. */
+struct FFGWeapon
+{
+    const TCHAR* Name;
+    const TCHAR* Prop;          // static mesh in /Game/IronHorse/props shown instead of the revolver arm, or null
+    float PropLengthCm;
+    int32 Rounds;
+    float Cooldown;
+    float Damage;               // bandits have 25, heavies 50
+    int32 MaxHits;              // how many targets one shot can take: a shotgun's spread, a rifle going through
+    float AssistScale;          // on top of the game's aim assist
+    int32 Tracers;
+    float SfxPitch;
+};
 
 /**
  * Lohith's fixed first-person character (lean, crouch, crosshair, six-shooter hitscan), driven by the webcam
@@ -50,6 +66,13 @@ public:
     float ForcedDropNow = 0.0f;
 
     FVector HeadLocation() const;
+
+    void SetWeapon(int32 Index);
+    const FFGWeapon& Weapon() const;
+    int32 WeaponIndex = 0;
+
+    UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
+    TObjectPtr<UStaticMeshComponent> LongGun;
 
     /** Lose a hat. Returns true if that was the last one. */
     bool TakeHit();

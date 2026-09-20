@@ -38,7 +38,7 @@ namespace
 {
     constexpr float CruiseSpeed = 26.0f;            // m/s at the start of a run
     constexpr float TopSpeed = 46.0f;               // and the most it ever gets to
-    constexpr float StageSeconds = 40.0f;
+    constexpr float StageSeconds = 28.0f;           // played at 40: too long between bosses
     constexpr float StartDistance = 58.0f;          // metres: alongside the station platform
     constexpr float PlayerForwardCm = 300.0f;       // how far up the passenger car roof the player stands
     constexpr float AimAssistDegrees = 7.0f;        // how far off a shot may be and still hit
@@ -86,6 +86,15 @@ void AFGIronHorseGameMode::BeginPlay()
     if (USoundBase* Loop = FGAssets::Sound(TEXT("train_loop")))
     {
         TrainLoop = UGameplayStatics::SpawnSound2D(this, Loop, 0.0f, 1.0f, 0.0f, nullptr, false, false);
+    }
+
+    const TCHAR* Tracks[3] = { TEXT("music_day"), TEXT("music_night"), TEXT("music_boss") };
+    for (int32 i = 0; i < 3; ++i)
+    {
+        if (USoundBase* Track = FGAssets::Sound(Tracks[i]))
+        {
+            Music[i] = UGameplayStatics::SpawnSound2D(this, Track, 0.001f, 1.0f, 0.0f, nullptr, false, false);
+        }
     }
 
     // Two people playing a webcam game on a laptop: spend the GPU on frame rate, not on ray tracing.
@@ -477,13 +486,14 @@ void AFGIronHorseGameMode::BeginLap(int32 NewLap)
     Prompt = SubPrompt = TEXT("");
     World->bStraightOnly = false;
     NextStage(EFGStage::Riders);
-    SpawnTimer = Lap == 0 ? 14.0f : 5.0f;
+    SpawnTimer = Lap == 0 ? 8.0f : 3.0f;
+    if (Player->WeaponIndex != Lap % 4 || Lap > 0) { Player->SetWeapon(Lap); }      // a new gun every lap
     if (Lap > 0)
     {
         // The first boss falls at sunset. After him it is night, and after the next one morning, and so on.
         NightTarget = Lap % 2 ? 1.0f : 0.0f;
         if (NightTarget == 0.0f) { Dusk = 0.1f; }
-        Banner = NightTarget > 0.5f ? TEXT("NIGHT FALLS") : TEXT("DAWN");
+        Banner = FString::Printf(TEXT("%s    %s"), NightTarget > 0.5f ? TEXT("NIGHT FALLS") : TEXT("DAWN"), Player->Weapon().Name);
         BannerTime = 3.5f;
     }
 }
@@ -567,6 +577,16 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
     if (!BanditTrain->IsHidden()) { BanditTrain->Place(World, TrainSpeed); }
     Player->Rumble = FMath::Min(TrainSpeed / CruiseSpeed, 1.4f);
     if (TrainLoop) { TrainLoop->SetVolumeMultiplier(0.15f + 0.85f * Player->Rumble); TrainLoop->SetPitchMultiplier(0.6f + 0.5f * Player->Rumble); }
+
+    // Music: day ride, night heist, or the duel. All three keep playing and only the volumes move, so the change
+    // is a crossfade and never a restart.
+    const int32 Wanted = Phase == EFGPhase::Showdown ? 2 : (NightTarget > 0.5f ? 1 : 0);
+    for (int32 i = 0; i < 3; ++i)
+    {
+        const float Loud = Phase == EFGPhase::Result ? 0.25f : (Phase == EFGPhase::Ride || Phase == EFGPhase::Showdown ? 0.55f : 0.4f);
+        MusicLevel[i] = FMath::FInterpConstantTo(MusicLevel[i], i == Wanted ? Loud : 0.0f, DeltaTime, 0.35f);
+        if (Music[i]) { Music[i]->SetVolumeMultiplier(FMath::Max(MusicLevel[i], 0.001f)); }
+    }
 
     // Steam from the stack
     SteamTimer -= DeltaTime;
@@ -672,7 +692,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
     // Never a dead stretch: if there has been nobody to shoot at for a few seconds, whatever the stage is waiting
     // for (the other train to arrive, a crew used up), a rider comes up. On the right only while the left is a railway.
     QuietTime = AliveBandits() > 0 ? 0.0f : QuietTime + DeltaTime;
-    if (QuietTime > 2.5f && !bNarrow && !bTunnelNear && !bGapNear && !(Stage == EFGStage::Riders && StageTime < 12.0f && Lap == 0))
+    if (QuietTime > 2.5f && !bNarrow && !bTunnelNear && !bGapNear && !(Stage == EFGStage::Riders && StageTime < 7.0f && Lap == 0))
     {
         QuietTime = 0.0f;
         const bool bLeftBusy = World->MetresTo(TEXT("side_track")) >= 0.0f && World->MetresTo(TEXT("side_track")) < 300.0f;
@@ -698,14 +718,14 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
             // (Not the station on the first lap: we have only just left one.)
             World->Queue(Lap == 0 ? TArray<FString>{ TEXT("Flat_A+town"), TEXT("Flat_B+town") } : TArray<FString>{ TEXT("Flat_A+town"), TEXT("Landmark_Station_A"), TEXT("Flat_B+town") });
         }
-        if (Once(0, 14.0f))
+        if (Once(0, 6.0f))
         {
             // A trestle bridge over a gulch. Riders drop back for it: there is nowhere to ride.
             World->Queue(Lap % 2 ? TArray<FString>{ TEXT("Gulch_A"), TEXT("Flat_B"), TEXT("Gulch_CurveR_A") } : TArray<FString>{ TEXT("Gulch_A") });
         }
         if (SpawnTimer <= 0.0f && AliveBandits() < MaxAlive() && !bNarrow && !bTunnelNear && !bGapNear)
         {
-            SpawnTimer = StageTime < 12.0f && Lap == 0 ? 5.0f : SpawnEvery();
+            SpawnTimer = StageTime < 8.0f && Lap == 0 ? 4.0f : SpawnEvery();
             FFGBanditSpec Spec;
             Spec.Kind = EFGBanditKind::Rider;
             const float Side = SpawnCount % 2 ? -1.0f : 1.0f;
@@ -725,7 +745,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
         {
             World->Queue({ TEXT("CanyonDeep_Entry_A"), TEXT("CanyonDeep_Mid_A"), TEXT("CanyonDeep_CurveL_A"), TEXT("CanyonDeep_Mid_A"), TEXT("CanyonDeep_CurveR_A"), TEXT("CanyonDeep_Exit_A"), TEXT("Flat_A") });
         }
-        if (Once(1, 12.0f))
+        if (Once(1, 6.0f))
         {
             // Straight tunnel pieces only: those are the ones the streamer widens.
             World->Queue({ TEXT("Tunnel_Entry_A"), TEXT("Tunnel_Mid_A"), TEXT("Tunnel_Mid_A"), TEXT("Tunnel_Mid_A"), TEXT("Tunnel_Exit_A"), TEXT("Rocky_A") });
@@ -734,7 +754,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
         {
             TArray<FString> Line = { TEXT("SideTrack_Start_A") };
             const TCHAR* Pattern[] = { TEXT("SideTrack_Mid_A"), TEXT("SideTrack_Mid_A"), TEXT("SideTrack_CurveL_A"), TEXT("SideTrack_Mid_A"), TEXT("SideTrack_CurveR_A"), TEXT("SideTrack_Mid_A") };
-            const int32 Pieces = FMath::CeilToInt32(55.0f * TargetSpeed() / 50.0f);
+            const int32 Pieces = FMath::CeilToInt32((StageSeconds + 22.0f) * TargetSpeed() / 50.0f);
             for (int32 i = 0; i < Pieces; ++i) { Line.Add(Pattern[i % 6]); }
             Line.Add(TEXT("SideTrack_End_A"));
             World->Queue(Line);
@@ -763,7 +783,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
     {
         // The bandit train pulls alongside once there is a second line to run on, and drops back before it ends.
         const float ToSide = World->MetresTo(TEXT("side_track"));
-        const bool bTimeUp = TrainTime > StageSeconds + 5.0f || (TrainTime > 8.0f && ToSide != 0.0f) || (BanditTrain->IsHidden() && StageTime > 45.0f);
+        const bool bTimeUp = TrainTime > StageSeconds + 8.0f || (TrainTime > 8.0f && ToSide != 0.0f) || (BanditTrain->IsHidden() && StageTime > 35.0f);
         if (BanditTrain->IsHidden() && ToSide == 0.0f && !bTimeUp)
         {
             BanditTrain->SetActorHiddenInGame(false);
@@ -846,7 +866,7 @@ void AFGIronHorseGameMode::TickShowdown(float DeltaTime)
         HolsteredFor = In.bHolstered ? HolsteredFor + DeltaTime : 0.0f;
         HolsterWait += DeltaTime;
         // A booth player who never finds the holster pose still gets their duel.
-        if (HolsteredFor > 0.8f || HolsterWait > 9.0f)
+        if (HolsteredFor > 0.6f || HolsterWait > 6.0f)
         {
             Prompt = TEXT("WAIT FOR IT...");
             SubPrompt = TEXT("");
@@ -855,15 +875,10 @@ void AFGIronHorseGameMode::TickShowdown(float DeltaTime)
             PlaySfx(TEXT("heartbeat"));
         }
         break;
-    case 3:     // hands off until the whistle
-        if (!In.bHolstered && ShowdownTimer > 0.15f && HolsterWait <= 9.0f)
-        {
-            Prompt = TEXT("TOO EARLY");
-            HolsteredFor = 0.0f;
-            ShowdownTimer = 1.2f;
-            ShowdownStep = 5;
-        }
-        else if (ShowdownTimer <= 0.0f)
+    case 3:     // the wait. Only a SHOT before the whistle is too early (see ResolvePlayerShot). This used to watch the
+                // holster flag as well, and that flag flickers whenever the body model loses the arm for a frame:
+                // players were told TOO EARLY while standing perfectly still.
+        if (ShowdownTimer <= 0.0f)
         {
             Prompt = TEXT("DRAW!");
             PlaySfx(TEXT("whistle"));
@@ -880,8 +895,13 @@ void AFGIronHorseGameMode::TickShowdown(float DeltaTime)
             Boss->Draw(0.7f);           // he keeps shooting until someone drops
         }
         break;
-    case 5:
-        if (ShowdownTimer <= 0.0f) { ShowdownStep = 2; }
+    case 5:     // after a shot too early: straight back to the wait, no need to holster again
+        if (ShowdownTimer <= 0.0f)
+        {
+            Prompt = TEXT("WAIT FOR IT...");
+            ShowdownTimer = FMath::FRandRange(1.8f, 3.2f);
+            ShowdownStep = 3;
+        }
         break;
     case 6:     // aftermath
         if (ShowdownTimer <= 0.0f) { BeginLap(Lap + 1); }        // no ending: it goes round again, harder, until you drop
@@ -920,11 +940,13 @@ void AFGIronHorseGameMode::OnPlayerReloaded() {}
 
 bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVector& Dir, const FVector& Muzzle)
 {
-    PlaySfx(TEXT("shot_player"));
+    const FFGWeapon& Gun = Player->Weapon();
+    PlaySfx(TEXT("shot_player"), 1.0f, Gun.SfxPitch);
     UWorld* W = GetWorld();
 
     // Webcam aim is noisy, so be generous: anything within a few degrees of the ray counts. Nearest to the ray wins.
-    const float Assist = Phase == EFGPhase::Bell ? 6.0f : AimAssistDegrees;
+    const float Assist = (Phase == EFGPhase::Bell ? 6.0f : AimAssistDegrees) * Gun.AssistScale;
+    TArray<TPair<float, AFGBandit*>> AlsoHit;       // a shotgun's spread, a rifle going through
     AFGBandit* BestBandit = nullptr;
     AFGTarget* BestTarget = nullptr;
     float BestScore = 1.0f;
@@ -941,8 +963,9 @@ bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVecto
         const float Allowed = FMath::Max(Assist, FMath::RadiansToDegrees(FMath::Atan(48.0f / Dist)));
         const float ChestScore = AngleBetween(Dir, Chest - Origin) / Allowed;
         const float HeadAngle = AngleBetween(Dir, Head - Origin);
-        const bool bHeadHit = HeadAngle < FMath::RadiansToDegrees(FMath::Atan(17.0f / Dist)) + 0.35f;
+        const bool bHeadHit = HeadAngle < FMath::RadiansToDegrees(FMath::Atan(27.0f / Dist)) + 0.6f;       // head and hat
         const float S = bHeadHit ? FMath::Min(ChestScore, 0.2f) : ChestScore;
+        if (S < 1.0f && B != Boss) { AlsoHit.Emplace(S, B); }
         if (S < BestScore) { BestScore = S; BestBandit = B; BestTarget = nullptr; bHead = bHeadHit; HitPoint = bHeadHit ? Head : Chest; }
     }
     for (AFGTarget* T : Targets)
@@ -982,11 +1005,17 @@ bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVecto
     // Flash, tracer
     const FVector ToHit = (HitPoint - Muzzle).GetSafeNormal();
     const FQuat Along = ToHit.ToOrientationQuat() * FQuat(FRotator(0.0, -90.0, 0.0));     // fx meshes point along +Y
-    if (AFGFx* Flash = AFGFx::Spawn(W, TEXT("fx"), TEXT("SM_MuzzleFlash_A"), FTransform(Along, Muzzle, FVector(0.6f)), 0.06f))
+    if (AFGFx* Flash = AFGFx::Spawn(W, TEXT("fx"), Gun.Tracers > 1 ? TEXT("SM_MuzzleFlash_Big") : TEXT("SM_MuzzleFlash_A"), FTransform(Along, Muzzle, FVector(0.6f)), 0.06f))
     {
         Flash->AddLight(FLinearColor(1.0f, 0.7f, 0.35f), 900.0f, 1500.0f);
     }
     const float TracerSpeed = 40000.0f;
+    for (int32 i = 1; i < Gun.Tracers; ++i)
+    {
+        // pellets: the same tracer, fanned out
+        const FVector Spread = (ToHit + FVector(FMath::FRandRange(-0.06f, 0.06f), FMath::FRandRange(-0.06f, 0.06f), FMath::FRandRange(-0.04f, 0.04f))).GetSafeNormal();
+        AFGFx::Spawn(W, TEXT("fx"), TEXT("SM_Tracer_Player"), FTransform(Spread.ToOrientationQuat() * FQuat(FRotator(0.0, -90.0, 0.0)), Muzzle, FVector(1.0f, 1.2f, 1.0f)), 0.09f, Spread * TracerSpeed);
+    }
     AFGFx::Spawn(W, TEXT("fx"), TEXT("SM_Tracer_Player"), FTransform(Along, Muzzle, FVector(1.0f, 2.0f, 1.0f)), FMath::Clamp(FVector::Dist(Muzzle, HitPoint) / TracerSpeed, 0.03f, 0.2f), ToHit * TracerSpeed);
 
     if (BestBandit)
@@ -996,6 +1025,19 @@ bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVecto
         Fake.ImpactPoint = Fake.Location = HitPoint;
         UGameplayStatics::ApplyPointDamage(BestBandit, bHead ? 100.0f : Player->ShotDamage, Dir, Fake, Player->GetController(), Player, nullptr);
         if (!BestBandit->IsDead()) { BestBandit->Play(TEXT("hit")); PlaySfx(TEXT("grunt")); }
+        AlsoHit.Sort([](const TPair<float, AFGBandit*>& A, const TPair<float, AFGBandit*>& B) { return A.Key < B.Key; });
+        int32 Extra = Gun.MaxHits - 1;
+        for (const TPair<float, AFGBandit*>& Other : AlsoHit)
+        {
+            if (Extra <= 0) { break; }
+            if (Other.Value == BestBandit || Other.Value->IsDead()) { continue; }
+            FVector Chest, Head;
+            Other.Value->AimPoints(Chest, Head);
+            Fake.ImpactPoint = Fake.Location = Chest;
+            Other.Value->bHeadshot = false;
+            UGameplayStatics::ApplyPointDamage(Other.Value, Player->ShotDamage, Dir, Fake, Player->GetController(), Player, nullptr);
+            --Extra;
+        }
         if (AFGFx* P = AFGFx::Spawn(W, TEXT("fx"), TEXT("SM_Puff_Dust"), FTransform(FRotator::ZeroRotator, HitPoint, FVector(0.25f)), 0.35f, FVector::ZeroVector, 4.0f)) { P->Glow(FLinearColor(0.80f, 0.62f, 0.40f), 0.5f); }
         HitMarker = 1.0f;
     }
@@ -1268,7 +1310,7 @@ void AFGIronHorseGameMode::TickAtmosphere(float DeltaTime)
     }
     // The day runs with the lap: golden hour at the station, the sun sinking dead ahead so the boss stands in front
     // of it, then night after he falls, and morning after the next one.
-    if (Phase == EFGPhase::Ride && NightTarget < 0.5f) { Dusk = FMath::Max(Dusk, FMath::Clamp((int32(Stage) * StageSeconds + StageTime) / (3.2f * StageSeconds), 0.0f, 0.9f)); }
+    if (Phase == EFGPhase::Ride && NightTarget < 0.5f) { Dusk = FMath::Max(Dusk, FMath::Clamp((int32(Stage) * StageSeconds + StageTime) / (3.4f * StageSeconds), 0.0f, 0.9f)); }
     if (Phase == EFGPhase::Showdown && NightTarget < 0.5f) { Dusk = FMath::FInterpConstantTo(Dusk, 1.0f, DeltaTime, 0.08f); }
     Night = FMath::FInterpConstantTo(Night, NightTarget, DeltaTime, 0.12f);
 

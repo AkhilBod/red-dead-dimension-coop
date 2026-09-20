@@ -4,11 +4,47 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "FGAssets.h"
 #include "FGIronHorseGameMode.h"
 #include "FGTrackerInput.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+
+namespace
+{
+    const FFGWeapon Weapons[] = {
+        //  name            prop                      len  rounds  cooldown  damage  hits  assist  tracers  pitch
+        { TEXT("REVOLVER"),   nullptr,                   0.0f, 6, 0.25f, 25.0f, 1, 1.0f, 1, 1.00f },
+        { TEXT("SHOTGUN"),    TEXT("SM_Shotgun"),       87.0f, 4, 0.55f, 50.0f, 3, 1.7f, 6, 0.72f },   // wide, takes a cluster, slow, four shells
+        { TEXT("RIFLE"),      TEXT("SM_Rifle"),        100.0f, 8, 0.35f, 50.0f, 2, 1.0f, 1, 1.25f },   // drops a heavy in one, goes through to the man behind
+        { TEXT("LONG COLT"),  TEXT("SM_Revolver_Long"), 44.0f, 7, 0.20f, 25.0f, 1, 1.15f, 1, 1.10f },  // quick, seven rounds
+    };
+}
+
+const FFGWeapon& AFGTrainPlayer::Weapon() const { return Weapons[WeaponIndex]; }
+
+void AFGTrainPlayer::SetWeapon(int32 Index)
+{
+    WeaponIndex = ((Index % int32(UE_ARRAY_COUNT(Weapons))) + UE_ARRAY_COUNT(Weapons)) % UE_ARRAY_COUNT(Weapons);
+    const FFGWeapon& W = Weapon();
+    MagazineSize = W.Rounds;
+    CurrentAmmo = W.Rounds;
+    FireCooldown = W.Cooldown;
+    ShotDamage = W.Damage;
+    // The viewmodel is one skinned mesh, arm and revolver together, so a long gun replaces all of it.
+    const bool bProp = W.Prop != nullptr;
+    LongGun->SetStaticMesh(bProp ? FGAssets::StaticMesh(TEXT("props"), W.Prop) : nullptr);
+    LongGun->SetVisibility(bProp);
+    Revolver->SetVisibility(!bProp, false);
+    if (bProp)
+    {
+        // Both are modelled pointing along +Y with the origin at the grip. Put the prop's grip where the revolver's is:
+        // its muzzle bone, less the revolver's own barrel (37 cm).
+        const FVector Muzzle = Revolver->DoesSocketExist(TEXT("muzzle")) ? Revolver->GetSocketTransform(TEXT("muzzle"), RTS_Component).GetLocation() : FVector(7.0f, 30.0f, -8.0f);
+        LongGun->SetRelativeLocation(Muzzle - FVector(0.0f, 37.0f, 3.0f));
+    }
+}
 
 AFGTrainPlayer::AFGTrainPlayer()
 {
@@ -31,6 +67,12 @@ AFGTrainPlayer::AFGTrainPlayer()
     Revolver->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Revolver->SetCastShadow(false);
     Revolver->bOnlyOwnerSee = false;
+
+    LongGun = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LongGun"));
+    LongGun->SetupAttachment(Revolver);
+    LongGun->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LongGun->SetCastShadow(false);
+    LongGun->SetVisibility(false);
 
     RevolverL = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("RevolverL"));
     RevolverL->SetupAttachment(FirstPersonCamera);
@@ -203,7 +245,11 @@ void AFGTrainPlayer::HandleFire(FVector2D Aim, int32 Gun)
     }
     ++ShotsFired;
     PlayGun(TEXT("fp_fire"), false, Gun);
-    const FVector Muzzle = Model->DoesSocketExist(TEXT("muzzle")) ? Model->GetSocketLocation(TEXT("muzzle")) : HeadLocation() + Dir * 60.0f;
+    FVector Muzzle = Model->DoesSocketExist(TEXT("muzzle")) ? Model->GetSocketLocation(TEXT("muzzle")) : HeadLocation() + Dir * 60.0f;
+    if (Gun == 0 && Weapon().Prop)
+    {
+        Muzzle = LongGun->GetComponentTransform().TransformPosition(FVector(0.0f, Weapon().PropLengthCm, 4.0f));
+    }
     if (GM->ResolvePlayerShot(Origin, Dir.GetSafeNormal(), Muzzle))
     {
         ++ShotsHit;

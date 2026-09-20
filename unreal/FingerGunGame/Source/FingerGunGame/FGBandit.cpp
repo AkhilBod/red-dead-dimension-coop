@@ -143,7 +143,7 @@ void AFGBandit::AimPoints(FVector& OutChest, FVector& OutHead) const
 {
     const float Scale = Body->GetComponentScale().Z;
     const bool bBones = Body->DoesSocketExist(TEXT("head")) && Body->DoesSocketExist(TEXT("spine_02"));
-    OutHead = bBones ? Body->GetSocketLocation(TEXT("head")) + FVector(0, 0, 8) : Body->GetComponentLocation() + FVector(0, 0, 168.0f * Scale);
+    OutHead = bBones ? Body->GetSocketLocation(TEXT("head")) + FVector(0, 0, 14) : Body->GetComponentLocation() + FVector(0, 0, 168.0f * Scale);
     OutChest = bBones ? Body->GetSocketLocation(TEXT("spine_02")) : Body->GetComponentLocation() + FVector(0, 0, 115.0f * Scale);
 }
 
