@@ -37,7 +37,7 @@
 namespace
 {
     constexpr float CruiseSpeed = 26.0f;            // m/s at the start of a run
-    constexpr float TopSpeed = 46.0f;               // and the most it ever gets to
+    constexpr float TopSpeed = 40.0f;               // and the most it ever gets to
     constexpr float StageSeconds = 28.0f;           // played at 40: too long between bosses
     constexpr float StartDistance = 58.0f;          // metres: alongside the station platform
     constexpr float PlayerForwardCm = 300.0f;       // how far up the passenger car roof the player stands
@@ -467,12 +467,14 @@ void AFGIronHorseGameMode::Depart()
 
 // ------------------------------------------------------------------ the endless run
 
-float AFGIronHorseGameMode::TargetSpeed() const { return FMath::Min(CruiseSpeed + 2.0f * Lap + RideTime / 60.0f * 2.5f, TopSpeed); }
-int32 AFGIronHorseGameMode::MaxAlive() const { return FMath::Clamp(3 + Lap, 3, 6); }
-int32 AFGIronHorseGameMode::TokenLimit() const { return Lap >= 2 ? 3 : 2; }
-float AFGIronHorseGameMode::ShotFlight() const { return FMath::Max(0.45f, 0.7f - 0.05f * Lap); }
-float AFGIronHorseGameMode::FireDelayScale() const { return FMath::Max(0.55f, 1.0f - 0.12f * Lap); }
-float AFGIronHorseGameMode::SpawnEvery() const { return FMath::Max(1.2f, 2.7f - 0.4f * Lap); }
+// Played at the first settings: "too extreme, too much going on at once". So fewer people on screen, one shooter at a
+// time to begin with, longer gaps between their shots and between spawns, and a gentler climb.
+float AFGIronHorseGameMode::TargetSpeed() const { return FMath::Min(CruiseSpeed + 1.5f * Lap + RideTime / 60.0f * 1.5f, TopSpeed); }
+int32 AFGIronHorseGameMode::MaxAlive() const { return FMath::Clamp(2 + (Lap + 1) / 2, 2, 4); }
+int32 AFGIronHorseGameMode::TokenLimit() const { return Lap >= 1 ? 2 : 1; }
+float AFGIronHorseGameMode::ShotFlight() const { return FMath::Max(0.5f, 0.75f - 0.04f * Lap); }
+float AFGIronHorseGameMode::FireDelayScale() const { return FMath::Max(0.7f, 1.3f - 0.1f * Lap); }
+float AFGIronHorseGameMode::SpawnEvery() const { return FMath::Max(2.0f, 3.6f - 0.3f * Lap); }
 
 TFunction<FTransform()> AFGIronHorseGameMode::OnOwnCar(int32 CarIndex) const
 {
@@ -626,6 +628,11 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
         break;
     case EFGPhase::Result:
         ResultTime += DeltaTime;
+        if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+        {
+            const bool bKey = PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar);
+            if ((bKey && ResultTime > 1.0f) || ResultTime > 30.0f) { RideAgain(); }
+        }
         break;
     }
 
@@ -698,7 +705,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
     // Never a dead stretch: if there has been nobody to shoot at for a few seconds, whatever the stage is waiting
     // for (the other train to arrive, a crew used up), a rider comes up. On the right only while the left is a railway.
     QuietTime = AliveBandits() > 0 ? 0.0f : QuietTime + DeltaTime;
-    if (QuietTime > 2.5f && !bNarrow && !bTunnelNear && !bGapNear && !(Stage == EFGStage::Riders && StageTime < 7.0f && Lap == 0))
+    if (QuietTime > 4.0f && !bNarrow && !bTunnelNear && !bGapNear && !(Stage == EFGStage::Riders && StageTime < 7.0f && Lap == 0))
     {
         QuietTime = 0.0f;
         const bool bLeftBusy = World->MetresTo(TEXT("side_track")) >= 0.0f && World->MetresTo(TEXT("side_track")) < 300.0f;
@@ -774,7 +781,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
             Spec.Slot = Slots[SpawnCount % 5] + FVector(0, 0, AFGTrain::RoofCm);
             Spec.Anchor = OnOwnCar(2);
             // From the second lap one in four boarders brings dynamite.
-            const bool bDynamite = Lap >= 1 && SpawnCount % 4 == 1;
+            const bool bDynamite = Lap >= 2 && SpawnCount % 5 == 1;
             Spec.Kind = bDynamite ? EFGBanditKind::Dynamiter : EFGBanditKind::Boarder;
             Spec.Mesh = bDynamite ? TEXT("SK_Dynamiter") : (SpawnCount % 4 == 3 ? TEXT("SK_Heavy") : (SpawnCount % 2 ? TEXT("SK_Bandit") : TEXT("SK_Deputy")));
             Spec.Health = Spec.Mesh == TEXT("SK_Heavy") ? 50.0f : 25.0f;
@@ -809,14 +816,14 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
                 SpawnBarrel(FVector(200.0f, 0.0f, AFGTrain::RoofCm), OnCar(2));
             }
             // A crew, not a fountain: so many per visit, and they climb up the far side.
-            if (bBanditTrainCrewed && SpawnTimer <= 0.0f && AliveBandits() < MaxAlive() + 1 && CrewSpawned < 10 + 3 * Lap)
+            if (bBanditTrainCrewed && SpawnTimer <= 0.0f && AliveBandits() < MaxAlive() && CrewSpawned < 6 + 2 * Lap)
             {
                 SpawnTimer = SpawnEvery();
                 struct FSeat { int32 Car; FVector Local; };
                 static const FSeat Seats[] = { {3, {350, 0, 0}}, {2, {-150, 0, 0}}, {3, {-400, 30, 0}}, {2, {300, -20, 0}}, {4, {0, 0, -130}}, {3, {0, -30, 0}} };
                 const FSeat& Seat = Seats[SpawnCount % 6];
                 FFGBanditSpec Spec;
-                Spec.Kind = SpawnCount % 4 == 2 ? EFGBanditKind::Dynamiter : EFGBanditKind::TrainShooter;
+                Spec.Kind = SpawnCount % 6 == 2 ? EFGBanditKind::Dynamiter : EFGBanditKind::TrainShooter;
                 Spec.Mesh = Spec.Kind == EFGBanditKind::Dynamiter ? TEXT("SK_Dynamiter") : TEXT("SK_Rifleman");
                 Spec.Slot = Seat.Local + FVector(0, 0, AFGTrain::RoofCm);
                 Spec.Anchor = OnCar(Seat.Car);
@@ -937,8 +944,52 @@ bool AFGIronHorseGameMode::HandleUiShot(FVector2D Aim)
     PlaySfx(TEXT("shot_player"));
     // Any shot restarts, not only one on the button: a dead player has no steady crosshair, and the booth must never
     // need a keyboard.
-    UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this)));
+    RideAgain();
     return true;
+}
+
+void AFGIronHorseGameMode::RideAgain()
+{
+    UE_LOG(LogTemp, Log, TEXT("IronHorse: ride again"));
+    for (AFGBandit* B : Bandits) { if (B) { B->Destroy(); } }
+    for (AFGTarget* T : Targets) { if (T) { T->Destroy(); } }
+    for (FFGEnemyShot& Shot : Shots) { if (Shot.Fx.IsValid()) { Shot.Fx->Destroy(); } }
+    Bandits.Reset();
+    Targets.Reset();
+    Shots.Reset();
+    Boss = nullptr;
+    TokensOut = 0;
+
+    Score = Kills = Headshots = Dodges = 0;
+    Lap = BossesBeaten = SpawnCount = CrewSpawned = 0;
+    DrawTimeMs = -1.0f;
+    DistanceM = 0.0;
+    RideTime = ResultTime = TrainSpeed = InvulnerableFor = QuietTime = BannerTime = 0.0f;
+    bPlayerDead = bBossBeaten = bInTunnel = bBanditTrainCrewed = bStayDown = bDuckWarning = false;
+    LeanWarning = 0.0f;
+    LastDuckDistance = LastLeanDistance = -1.0f;
+    ObstacleTimer = 12.0f;
+    ShowdownStep = 0;
+    Dusk = Night = NightTarget = 0.0f;
+    SunChainYaw = 150.0f;
+    SkyKey = -10.0f;
+
+    Player->Hats = 3;
+    Player->ShotsFired = Player->ShotsHit = 0;
+    Player->HitFlash = 0.0f;
+    Player->bGunHidden = false;
+    Player->ForcedDropCm = 0.0f;
+    Player->SetWeapon(0);
+
+    BanditTrain->SetActorHiddenInGame(true);
+    BanditTrain->Offset = -400.0;
+    World->ResetLine();
+    World->bAllowRandomLandmarks = false;
+    World->Queue({ TEXT("Flat_A"), TEXT("Landmark_Station_A"), TEXT("Flat_B"), TEXT("Rocky_A"), TEXT("Landmark_WaterTower_A"), TEXT("Cactus_A"), TEXT("CurveL_A"), TEXT("Mesa_A"), TEXT("CurveR_A") });
+    World->SetDistance(StartDistance);
+    Train->Place(World, 0.0f);
+
+    SetPhase(EFGPhase::Tutorial);       // straight to the cans: they have seen the title
 }
 
 void AFGIronHorseGameMode::OnPlayerDryFire() {}
@@ -1181,7 +1232,7 @@ void AFGIronHorseGameMode::SpawnEnemyShot(const FVector& From, bool bFast)
 {
     // Aimed at where the head is now. It takes 0.7 s to arrive: move and it misses.
     FFGEnemyShot& Shot = Shots.AddDefaulted_GetRef();
-    Shot.bAccurate = bFast || FMath::FRand() < 0.6f;
+    Shot.bAccurate = bFast || FMath::FRand() < 0.5f;
     Shot.Target = Player->HeadLocation();
     if (!Shot.bAccurate)
     {
@@ -1263,7 +1314,7 @@ void AFGIronHorseGameMode::TickShots(float DeltaTime)
 void AFGIronHorseGameMode::HurtPlayer(const TCHAR* Sfx)
 {
     if (bPlayerDead || bGod || InvulnerableFor > 0.0f || Phase == EFGPhase::Result) { return; }
-    InvulnerableFor = 1.5f;
+    InvulnerableFor = 2.2f;
     PlaySfx(Sfx);
     Player->Tracker->SendHit();
     const int32 Before = Player->Hats;
@@ -1307,9 +1358,9 @@ void AFGIronHorseGameMode::TickLeanObstacles(float DeltaTime)
     const bool bRiding = Phase == EFGPhase::Ride && TrainSpeed > 10.0f;
     ObstacleTimer -= bRiding ? DeltaTime : 0.0f;
     const float Ahead = FMath::Max(TrainSpeed, 15.0f) * 4.5f;
-    if (bRiding && ObstacleTimer <= 0.0f && D < 0.0f && !World->EventsWithin(Ahead + 120.0f))
+    if (bRiding && ObstacleTimer <= 0.0f && D < 0.0f && AliveBandits() <= 1 && !World->EventsWithin(Ahead + 120.0f))
     {
-        ObstacleTimer = FMath::FRandRange(9.0f, 16.0f) * FMath::Max(0.6f, 1.0f - 0.1f * Lap);
+        ObstacleTimer = FMath::FRandRange(16.0f, 26.0f);
         World->AddLeanObstacle(Ahead, FMath::RandBool() ? 1.0f : -1.0f);
     }
     // The arm is over the Side half, so the warning points the other way.

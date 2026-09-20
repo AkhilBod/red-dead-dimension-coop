@@ -318,6 +318,20 @@ bool AFGWorldStreamer::EventsWithin(float Metres) const
     return false;
 }
 
+void AFGWorldStreamer::ResetLine()
+{
+    while (Chain.Num()) { DropFirst(); }
+    for (FLeanObstacle& Ob : LeanObstacles)
+    {
+        for (USceneComponent* Part : Ob.Parts) { LiveDressing.Remove(Part); Part->DestroyComponent(); }
+    }
+    LeanObstacles.Reset();
+    Pending.Reset();
+    bNextIsTown = false;
+    bStraightOnly = false;
+    S = 0.0;
+}
+
 float AFGWorldStreamer::WorldYaw() const
 {
     return ChainRoot->GetComponentRotation().Yaw;
