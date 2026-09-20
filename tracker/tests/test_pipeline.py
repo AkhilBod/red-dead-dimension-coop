@@ -71,7 +71,7 @@ class PipelineTests(unittest.TestCase):
         sim.run(0.5, lambda k: aiming(wrist))
 
     def test_flick_fires_once(self):
-        sim = Sim()
+        sim = Sim(Config(flick_enabled=True))
         self._flick(sim)
         self.assertEqual(sim.count("fire"), 1)
 
@@ -465,7 +465,7 @@ class RecordedSessionRegressions(unittest.TestCase):
 
     def test_slow_relaxed_recoil_still_fires(self):
         # The recorded recoils took 0.25 s to rise, not the 0.1 s snap first assumed.
-        sim = Sim()
+        sim = Sim(Config(flick_enabled=True))
         wrist = rest_wrist()
         sim.run(1.0, lambda k: aiming(wrist))
         up = wrist + np.array([0.0, -0.2]) * SW

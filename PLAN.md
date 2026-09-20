@@ -12,7 +12,7 @@ Tracks: **Press Start** (main target), **No Wrapper** (the tracker is the hard p
 | You do this | The game does this |
 |---|---|
 | Make a finger gun and point at the screen | Crosshair follows your hand |
-| Drop your thumb, kick your hand up like recoil, or press the glove's switch | Fire. However you pretend to shoot, it shoots. The glove buzzes and flashes |
+| Drop your thumb, or press the glove's switch | Fire. The glove buzzes and flashes. (The recoil-kick trigger is off by default: it fired while re-aiming. `--set flick_enabled=1` brings it back) |
 | Slap the bottom of your gun hand with your other hand | Reload (six rounds, like slamming a magazine home) |
 | Lean or sidestep | Your view shifts, bullets miss |
 | Duck | Drop under tunnels, low bridges, and gatling fire |

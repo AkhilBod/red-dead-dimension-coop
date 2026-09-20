@@ -316,11 +316,11 @@ class Pipeline:
             if kick_onset is not None:
                 if self.reload.together(t):
                     self._reload(events, t)
+                elif self.reload.maybe_together(t):
+                    # Held even with the recoil trigger off: a slap the body model sees late still has to become a reload.
+                    self.pending_kick = (t + cfg.slap_decide_s, self._rewound(t, kick_onset))
                 elif cfg.flick_enabled:
-                    if self.reload.maybe_together(t):
-                        self.pending_kick = (t + cfg.slap_decide_s, self._rewound(t, kick_onset))
-                    else:
-                        self._fire(events, t, self._rewound(t, kick_onset), "flick")
+                    self._fire(events, t, self._rewound(t, kick_onset), "flick")
             if thumb_onset is not None:
                 self._fire(events, t, self._rewound(t, thumb_onset), "thumb")
 
@@ -344,7 +344,8 @@ class Pipeline:
                 self._reload(events, t)
             elif t >= self.pending_kick[0]:
                 raw_then, self.pending_kick = self.pending_kick[1], None
-                self._fire(events, t, raw_then, "flick")
+                if cfg.flick_enabled:
+                    self._fire(events, t, raw_then, "flick")
 
         scale_now = self.gun_scale.median() if self.gun_scale.buf else chest_scale
         if self.reload.approach(t, gun.wrist if gun else None, off.center if (gun and off) else None, scale_now, sw):

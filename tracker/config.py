@@ -90,7 +90,9 @@ class Config:
     # --- Recoil-flick trigger ------------------------------------------------
     # Feature: fingertip height above the wrist. [rec] level = 0.03-0.05 m, kicked = 0.10-0.15 m,
     # and a relaxed recoil takes 0.2-0.3 s to get there, not the sharp 0.1 s snap first assumed.
-    flick_enabled: bool = True
+    # Off: it fired while people re-aimed. The kick detector still runs, because a slap reload looks like one.
+    # F in the tuning window or --set flick_enabled=1 brings it back.
+    flick_enabled: bool = False
     flick_rise_m: float = 0.05
     flick_max_rise_s: float = 0.4       # slower than this is tilting to aim higher, not a kick
     flick_baseline_s: float = 0.5

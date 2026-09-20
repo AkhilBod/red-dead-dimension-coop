@@ -44,7 +44,7 @@ Stand 4 to 5 ft back with your shoulders in frame. Light your face and hands.
 
 The window opens fullscreen on purpose: the crosshair is mapped to the whole screen, like the game's will be, so in a small window it would travel less than your finger points. `--windowed` or **W** changes that.
 
-Keys: **Q** quit, **X** centre the crosshair on where you are pointing now, **[ ]** sensitivity down/up, **C** calibrate (shoot the 4 red targets), **N** recenter stance, **F** recoil trigger on/off, **R** record on/off, **W** fullscreen on/off.
+Keys: **Q** quit, **X** centre the crosshair on where you are pointing now, **[ ]** sensitivity down/up, **C** calibrate (shoot the 4 red targets), **N** recenter stance, **F** recoil trigger on/off (it starts off), **R** record on/off, **W** fullscreen on/off.
 
 Sensitivity is one physical number: `aim_span_m`, the metres of fingertip travel that cross the screen (default 0.36). **]** makes it more sensitive, **[** less, and it prints the value to keep with `--set aim_span_m=...`.
 
@@ -81,7 +81,7 @@ Jason's original [switch_led_buzz.ino](../arduino/switch_led_buzz/switch_led_buz
 1. The fps number top-left is white at 25+, yellow under 25, red under 20. It should sit at the camera's 30. Under 20 nothing else on this list means anything: close other apps.
 2. Raise your finger gun pointing at the middle of the screen. TRACK and AIM light up and the crosshair appears **in the middle**, wherever your hand is. It should feel steady and a little heavy, like a gun, not like a mouse: about 36 cm of fingertip travel crosses the screen. Want more: **]**. Less: **[**. Flick into a corner and back: the crosshair must return to where it was. Hold your hand past an edge for a second or two and it pulls the mapping along, so you can never lose it. **X** re-centres on where you point now.
 3. Fire 20 thumb shots at one spot: pop the thumb up, drop it. Want 18+ to register, none while just aiming. Missing shots: lower `thumb_drop_frac`. Firing by itself: raise it.
-4. Fire 10 recoil shots: kick the fingertip up. Small kicks not registering: lower `flick_rise_m` (0.04). It costs false shots when you re-aim upward fast, which is why it is 0.05.
+4. Only if you turn the recoil trigger on (**F**, off by default because it fired while re-aiming): fire 10 recoil shots, kick the fingertip up. Small kicks not registering: lower `flick_rise_m` (0.04). It costs false shots when you re-aim upward fast, which is why it is 0.05.
 5. Red X should land where you were aiming *before* the trigger motion, not where your hand ended up.
 6. Sweep your aim around fast. No shots should fire. If the recoil trigger misfires, press **F** to turn it off.
 7. Slap the bottom of your gun hand. One RELOAD, no FIRE, and the crosshair must not jump to the far side afterwards.
