@@ -53,7 +53,7 @@ if ($MouseOnly) { return }
 
 Push-Location $tracker
 try {
-    $trackerArguments = @('-u', 'run.py', '--no-window', '--no-preview', '--native-camera', '--camera', $Camera, '--arduino', $Arduino, '--fps', $CameraFps)
+    $trackerArguments = @('-u', 'run.py', '--no-window', '--native-camera', '--camera', $Camera, '--arduino', $Arduino, '--fps', $CameraFps)
     if ($LowLoad) { $trackerArguments += @('--pose-every', '2') }
     & $python @trackerArguments
     if ($LASTEXITCODE -ne 0) { throw "Tracker exited with code $LASTEXITCODE." }
