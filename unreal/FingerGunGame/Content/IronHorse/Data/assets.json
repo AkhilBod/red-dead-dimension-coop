@@ -1,0 +1,2239 @@
+{
+"assets": [
+{
+"path": "/Game/IronHorse/audio/bell",
+"name": "bell",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/bonk",
+"name": "bonk",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/boom",
+"name": "boom",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/dry",
+"name": "dry",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/glass",
+"name": "glass",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/grunt",
+"name": "grunt",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/heartbeat",
+"name": "heartbeat",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/hurt",
+"name": "hurt",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/music_boss",
+"name": "music_boss",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/music_day",
+"name": "music_day",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/music_night",
+"name": "music_night",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/reload",
+"name": "reload",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/ricochet",
+"name": "ricochet",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/shot_enemy",
+"name": "shot_enemy",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/shot_player",
+"name": "shot_player",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/telegraph",
+"name": "telegraph",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/thud",
+"name": "thud",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/train_loop",
+"name": "train_loop",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/whistle",
+"name": "whistle",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/audio/whiz",
+"name": "whiz",
+"class": "SoundWave"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Bank",
+"name": "SM_Bank",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Barn",
+"name": "SM_Barn",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Church",
+"name": "SM_Church",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_GeneralStore",
+"name": "SM_GeneralStore",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Hotel",
+"name": "SM_Hotel",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Outhouse",
+"name": "SM_Outhouse",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Shack",
+"name": "SM_Shack",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Sheriff",
+"name": "SM_Sheriff",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/SM_Station",
+"name": "SM_Station",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/buildings/WW_iron_red",
+"name": "WW_iron_red",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandit",
+"name": "SK_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandit_Skeleton",
+"name": "SK_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditaim",
+"name": "SK_Banditaim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditaim_start",
+"name": "SK_Banditaim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditclimb",
+"name": "SK_Banditclimb",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditcover_hide",
+"name": "SK_Banditcover_hide",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditcover_idle",
+"name": "SK_Banditcover_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditcover_popup",
+"name": "SK_Banditcover_popup",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditcover_shoot",
+"name": "SK_Banditcover_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditdeath_back",
+"name": "SK_Banditdeath_back",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditdeath_forward",
+"name": "SK_Banditdeath_forward",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditdual_aim",
+"name": "SK_Banditdual_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditdual_shoot",
+"name": "SK_Banditdual_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditfan_fire",
+"name": "SK_Banditfan_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditgatling_fire",
+"name": "SK_Banditgatling_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandithip_aim",
+"name": "SK_Bandithip_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandithip_fire",
+"name": "SK_Bandithip_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandithit",
+"name": "SK_Bandithit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bandithit_aim",
+"name": "SK_Bandithit_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditidle",
+"name": "SK_Banditidle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditkneel_aim",
+"name": "SK_Banditkneel_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditkneel_shoot",
+"name": "SK_Banditkneel_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditquickdraw",
+"name": "SK_Banditquickdraw",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditreload",
+"name": "SK_Banditreload",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_aim_left",
+"name": "SK_Banditride_aim_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_aim_right",
+"name": "SK_Banditride_aim_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_death",
+"name": "SK_Banditride_death",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_gallop",
+"name": "SK_Banditride_gallop",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_idle",
+"name": "SK_Banditride_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_shoot_left",
+"name": "SK_Banditride_shoot_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditride_shoot_right",
+"name": "SK_Banditride_shoot_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrifle_aim",
+"name": "SK_Banditrifle_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrifle_aim_start",
+"name": "SK_Banditrifle_aim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrifle_hit",
+"name": "SK_Banditrifle_hit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrifle_idle",
+"name": "SK_Banditrifle_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrifle_shoot",
+"name": "SK_Banditrifle_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditrun",
+"name": "SK_Banditrun",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditshoot",
+"name": "SK_Banditshoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditshoot_burst",
+"name": "SK_Banditshoot_burst",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditshotgun_shoot",
+"name": "SK_Banditshotgun_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditshowdown_idle",
+"name": "SK_Banditshowdown_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditthrow",
+"name": "SK_Banditthrow",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditwalk",
+"name": "SK_Banditwalk",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Banditwalk_shoot",
+"name": "SK_Banditwalk_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Boss",
+"name": "SK_Boss",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Boss_Skeleton",
+"name": "SK_Boss_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossaim",
+"name": "SK_Bossaim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossaim_start",
+"name": "SK_Bossaim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossclimb",
+"name": "SK_Bossclimb",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosscover_hide",
+"name": "SK_Bosscover_hide",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosscover_idle",
+"name": "SK_Bosscover_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosscover_popup",
+"name": "SK_Bosscover_popup",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosscover_shoot",
+"name": "SK_Bosscover_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossdeath_back",
+"name": "SK_Bossdeath_back",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossdeath_forward",
+"name": "SK_Bossdeath_forward",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossdual_aim",
+"name": "SK_Bossdual_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossdual_shoot",
+"name": "SK_Bossdual_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossfan_fire",
+"name": "SK_Bossfan_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossgatling_fire",
+"name": "SK_Bossgatling_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosship_aim",
+"name": "SK_Bosship_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosship_fire",
+"name": "SK_Bosship_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosshit",
+"name": "SK_Bosshit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosshit_aim",
+"name": "SK_Bosshit_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossidle",
+"name": "SK_Bossidle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosskneel_aim",
+"name": "SK_Bosskneel_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosskneel_shoot",
+"name": "SK_Bosskneel_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossquickdraw",
+"name": "SK_Bossquickdraw",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossreload",
+"name": "SK_Bossreload",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_aim_left",
+"name": "SK_Bossride_aim_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_aim_right",
+"name": "SK_Bossride_aim_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_death",
+"name": "SK_Bossride_death",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_gallop",
+"name": "SK_Bossride_gallop",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_idle",
+"name": "SK_Bossride_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_shoot_left",
+"name": "SK_Bossride_shoot_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossride_shoot_right",
+"name": "SK_Bossride_shoot_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrifle_aim",
+"name": "SK_Bossrifle_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrifle_aim_start",
+"name": "SK_Bossrifle_aim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrifle_hit",
+"name": "SK_Bossrifle_hit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrifle_idle",
+"name": "SK_Bossrifle_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrifle_shoot",
+"name": "SK_Bossrifle_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossrun",
+"name": "SK_Bossrun",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossshoot",
+"name": "SK_Bossshoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossshoot_burst",
+"name": "SK_Bossshoot_burst",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossshotgun_shoot",
+"name": "SK_Bossshotgun_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossshowdown_idle",
+"name": "SK_Bossshowdown_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bossthrow",
+"name": "SK_Bossthrow",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosswalk",
+"name": "SK_Bosswalk",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Bosswalk_shoot",
+"name": "SK_Bosswalk_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Deputy",
+"name": "SK_Deputy",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Dynamiter",
+"name": "SK_Dynamiter",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Gunslinger",
+"name": "SK_Gunslinger",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavy",
+"name": "SK_Heavy",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavy_Skeleton",
+"name": "SK_Heavy_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyaim",
+"name": "SK_Heavyaim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyaim_start",
+"name": "SK_Heavyaim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyclimb",
+"name": "SK_Heavyclimb",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavycover_hide",
+"name": "SK_Heavycover_hide",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavycover_idle",
+"name": "SK_Heavycover_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavycover_popup",
+"name": "SK_Heavycover_popup",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavycover_shoot",
+"name": "SK_Heavycover_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavydeath_back",
+"name": "SK_Heavydeath_back",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavydeath_forward",
+"name": "SK_Heavydeath_forward",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavydual_aim",
+"name": "SK_Heavydual_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavydual_shoot",
+"name": "SK_Heavydual_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyfan_fire",
+"name": "SK_Heavyfan_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavygatling_fire",
+"name": "SK_Heavygatling_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyhip_aim",
+"name": "SK_Heavyhip_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyhip_fire",
+"name": "SK_Heavyhip_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyhit",
+"name": "SK_Heavyhit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyhit_aim",
+"name": "SK_Heavyhit_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyidle",
+"name": "SK_Heavyidle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavykneel_aim",
+"name": "SK_Heavykneel_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavykneel_shoot",
+"name": "SK_Heavykneel_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyquickdraw",
+"name": "SK_Heavyquickdraw",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyreload",
+"name": "SK_Heavyreload",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_aim_left",
+"name": "SK_Heavyride_aim_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_aim_right",
+"name": "SK_Heavyride_aim_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_death",
+"name": "SK_Heavyride_death",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_gallop",
+"name": "SK_Heavyride_gallop",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_idle",
+"name": "SK_Heavyride_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_shoot_left",
+"name": "SK_Heavyride_shoot_left",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyride_shoot_right",
+"name": "SK_Heavyride_shoot_right",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrifle_aim",
+"name": "SK_Heavyrifle_aim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrifle_aim_start",
+"name": "SK_Heavyrifle_aim_start",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrifle_hit",
+"name": "SK_Heavyrifle_hit",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrifle_idle",
+"name": "SK_Heavyrifle_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrifle_shoot",
+"name": "SK_Heavyrifle_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyrun",
+"name": "SK_Heavyrun",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyshoot",
+"name": "SK_Heavyshoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyshoot_burst",
+"name": "SK_Heavyshoot_burst",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyshotgun_shoot",
+"name": "SK_Heavyshotgun_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavyshowdown_idle",
+"name": "SK_Heavyshowdown_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavythrow",
+"name": "SK_Heavythrow",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavywalk",
+"name": "SK_Heavywalk",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Heavywalk_shoot",
+"name": "SK_Heavywalk_shoot",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/characters/SK_Rifleman",
+"name": "SK_Rifleman",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/characters/WW_blue_dark",
+"name": "WW_blue_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_blue_faded",
+"name": "WW_blue_faded",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_grey",
+"name": "WW_grey",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_hair_black",
+"name": "WW_hair_black",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_hair_brown",
+"name": "WW_hair_brown",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_hair_ginger",
+"name": "WW_hair_ginger",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_leather",
+"name": "WW_leather",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_olive",
+"name": "WW_olive",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_plum",
+"name": "WW_plum",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_red_faded",
+"name": "WW_red_faded",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_skin_dark",
+"name": "WW_skin_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_skin_light",
+"name": "WW_skin_light",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_skin_red",
+"name": "WW_skin_red",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_skin_tan",
+"name": "WW_skin_tan",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/characters/WW_white",
+"name": "WW_white",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Boneyard_A",
+"name": "SM_FG_Chunk_Boneyard_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Cactus_A",
+"name": "SM_FG_Chunk_Cactus_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CanyonDeep_CurveL_A",
+"name": "SM_FG_Chunk_CanyonDeep_CurveL_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CanyonDeep_CurveR_A",
+"name": "SM_FG_Chunk_CanyonDeep_CurveR_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CanyonDeep_Entry_A",
+"name": "SM_FG_Chunk_CanyonDeep_Entry_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CanyonDeep_Exit_A",
+"name": "SM_FG_Chunk_CanyonDeep_Exit_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CanyonDeep_Mid_A",
+"name": "SM_FG_Chunk_CanyonDeep_Mid_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Canyon_A",
+"name": "SM_FG_Chunk_Canyon_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Canyon_B",
+"name": "SM_FG_Chunk_Canyon_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CurveL_A",
+"name": "SM_FG_Chunk_CurveL_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CurveL_B",
+"name": "SM_FG_Chunk_CurveL_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CurveR_A",
+"name": "SM_FG_Chunk_CurveR_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_CurveR_B",
+"name": "SM_FG_Chunk_CurveR_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Flat_A",
+"name": "SM_FG_Chunk_Flat_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Flat_B",
+"name": "SM_FG_Chunk_Flat_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Gulch_A",
+"name": "SM_FG_Chunk_Gulch_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Gulch_CurveR_A",
+"name": "SM_FG_Chunk_Gulch_CurveR_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_Arch_A",
+"name": "SM_FG_Chunk_Landmark_Arch_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_Camp_A",
+"name": "SM_FG_Chunk_Landmark_Camp_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_Gantry_A",
+"name": "SM_FG_Chunk_Landmark_Gantry_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_Shack_A",
+"name": "SM_FG_Chunk_Landmark_Shack_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_Station_A",
+"name": "SM_FG_Chunk_Landmark_Station_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Landmark_WaterTower_A",
+"name": "SM_FG_Chunk_Landmark_WaterTower_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Mesa_A",
+"name": "SM_FG_Chunk_Mesa_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Rocky_A",
+"name": "SM_FG_Chunk_Rocky_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Rocky_B",
+"name": "SM_FG_Chunk_Rocky_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SBendL_A",
+"name": "SM_FG_Chunk_SBendL_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SBendR_A",
+"name": "SM_FG_Chunk_SBendR_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SideTrack_CurveL_A",
+"name": "SM_FG_Chunk_SideTrack_CurveL_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SideTrack_CurveR_A",
+"name": "SM_FG_Chunk_SideTrack_CurveR_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SideTrack_End_A",
+"name": "SM_FG_Chunk_SideTrack_End_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SideTrack_Mid_A",
+"name": "SM_FG_Chunk_SideTrack_Mid_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_SideTrack_Start_A",
+"name": "SM_FG_Chunk_SideTrack_Start_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Telegraph_Fence_A",
+"name": "SM_FG_Chunk_Telegraph_Fence_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Tunnel_CurveL_A",
+"name": "SM_FG_Chunk_Tunnel_CurveL_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Tunnel_Entry_A",
+"name": "SM_FG_Chunk_Tunnel_Entry_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Tunnel_Exit_A",
+"name": "SM_FG_Chunk_Tunnel_Exit_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/SM_FG_Chunk_Tunnel_Mid_A",
+"name": "SM_FG_Chunk_Tunnel_Mid_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_bone",
+"name": "WW_bone",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_bottle_brown",
+"name": "WW_bottle_brown",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_bottle_green",
+"name": "WW_bottle_green",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_brass",
+"name": "WW_brass",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_cactus",
+"name": "WW_cactus",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_cactus_dark",
+"name": "WW_cactus_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_canvas",
+"name": "WW_canvas",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_deadwood",
+"name": "WW_deadwood",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_dirt",
+"name": "WW_dirt",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_eye",
+"name": "WW_eye",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_flower",
+"name": "WW_flower",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_glass",
+"name": "WW_glass",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_glass_lit",
+"name": "WW_glass_lit",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_gravel",
+"name": "WW_gravel",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_iron",
+"name": "WW_iron",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_mustard",
+"name": "WW_mustard",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paint_blue",
+"name": "WW_paint_blue",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paint_green",
+"name": "WW_paint_green",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paint_red",
+"name": "WW_paint_red",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paint_white",
+"name": "WW_paint_white",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paint_yellow",
+"name": "WW_paint_yellow",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_paper",
+"name": "WW_paper",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_plank",
+"name": "WW_plank",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_plank_dark",
+"name": "WW_plank_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_plank_grey",
+"name": "WW_plank_grey",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_plank_light",
+"name": "WW_plank_light",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rock_dark",
+"name": "WW_rock_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rock_grey",
+"name": "WW_rock_grey",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rock_orange",
+"name": "WW_rock_orange",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rock_pale",
+"name": "WW_rock_pale",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rock_red",
+"name": "WW_rock_red",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_rope",
+"name": "WW_rope",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_sage",
+"name": "WW_sage",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_sand",
+"name": "WW_sand",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_sand_dark",
+"name": "WW_sand_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_sand_light",
+"name": "WW_sand_light",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_shingle",
+"name": "WW_shingle",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_steel",
+"name": "WW_steel",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_steel_dark",
+"name": "WW_steel_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/chunks/WW_water",
+"name": "WW_water",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/fx/M_FG_Glow",
+"name": "M_FG_Glow",
+"class": "Material"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolver",
+"name": "SK_PlayerRevolver",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolver_Skeleton",
+"name": "SK_PlayerRevolver_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_draw",
+"name": "SK_PlayerRevolverfp_draw",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_dry_fire",
+"name": "SK_PlayerRevolverfp_dry_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_fire",
+"name": "SK_PlayerRevolverfp_fire",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_holster",
+"name": "SK_PlayerRevolverfp_holster",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_idle",
+"name": "SK_PlayerRevolverfp_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_reload",
+"name": "SK_PlayerRevolverfp_reload",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SK_PlayerRevolverfp_spin",
+"name": "SK_PlayerRevolverfp_spin",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Bullet",
+"name": "SM_Bullet",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Casing",
+"name": "SM_Casing",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_MuzzleFlash_A",
+"name": "SM_MuzzleFlash_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_MuzzleFlash_B",
+"name": "SM_MuzzleFlash_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_MuzzleFlash_Big",
+"name": "SM_MuzzleFlash_Big",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Puff_Dust",
+"name": "SM_Puff_Dust",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Puff_Smoke",
+"name": "SM_Puff_Smoke",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Puff_Steam",
+"name": "SM_Puff_Steam",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Shard_Glass",
+"name": "SM_Shard_Glass",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Slug",
+"name": "SM_Slug",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Splinter",
+"name": "SM_Splinter",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Tracer_Enemy",
+"name": "SM_Tracer_Enemy",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/SM_Tracer_Player",
+"name": "SM_Tracer_Player",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/fx/WW_flash",
+"name": "WW_flash",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/fx/WW_lead",
+"name": "WW_lead",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/fx/WW_tracer",
+"name": "WW_tracer",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bay",
+"name": "SK_Horse_Bay",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bay_Skeleton",
+"name": "SK_Horse_Bay_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bayhorse_death",
+"name": "SK_Horse_Bayhorse_death",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bayhorse_gallop",
+"name": "SK_Horse_Bayhorse_gallop",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bayhorse_idle",
+"name": "SK_Horse_Bayhorse_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bayhorse_rear",
+"name": "SK_Horse_Bayhorse_rear",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Bayhorse_walk",
+"name": "SK_Horse_Bayhorse_walk",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Black",
+"name": "SK_Horse_Black",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Grey",
+"name": "SK_Horse_Grey",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/horses/SK_Horse_Palomino",
+"name": "SK_Horse_Palomino",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/horses/WW_hoof",
+"name": "WW_hoof",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_horse_bay",
+"name": "WW_horse_bay",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_horse_black",
+"name": "WW_horse_black",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_horse_grey",
+"name": "WW_horse_grey",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_horse_palomino",
+"name": "WW_horse_palomino",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_horse_white",
+"name": "WW_horse_white",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_leather_light",
+"name": "WW_leather_light",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_mane_black",
+"name": "WW_mane_black",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_mane_brown",
+"name": "WW_mane_brown",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/horses/WW_mane_cream",
+"name": "WW_mane_cream",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/A_SK_Gatling_Anim",
+"name": "A_SK_Gatling_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/props/SK_Gatling",
+"name": "SK_Gatling",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/props/SK_Gatling_Skeleton",
+"name": "SK_Gatling_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/props/SM_Barrel",
+"name": "SM_Barrel",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Bench",
+"name": "SM_Bench",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_BottleCrate",
+"name": "SM_BottleCrate",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Bottle_Brown",
+"name": "SM_Bottle_Brown",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Bottle_Green",
+"name": "SM_Bottle_Green",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Crate",
+"name": "SM_Crate",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Crate_Small",
+"name": "SM_Crate_Small",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Dynamite",
+"name": "SM_Dynamite",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_DynamiteStick",
+"name": "SM_DynamiteStick",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Bandit",
+"name": "SM_Hat_Bandit",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Boss",
+"name": "SM_Hat_Boss",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Deputy",
+"name": "SM_Hat_Deputy",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Dynamiter",
+"name": "SM_Hat_Dynamiter",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Gunslinger",
+"name": "SM_Hat_Gunslinger",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Heavy",
+"name": "SM_Hat_Heavy",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Hat_Rifleman",
+"name": "SM_Hat_Rifleman",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_HayBale",
+"name": "SM_HayBale",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_HitchingPost",
+"name": "SM_HitchingPost",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_LampPost",
+"name": "SM_LampPost",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Lantern",
+"name": "SM_Lantern",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_LowGantry",
+"name": "SM_LowGantry",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Revolver",
+"name": "SM_Revolver",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Revolver_Long",
+"name": "SM_Revolver_Long",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Rifle",
+"name": "SM_Rifle",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Sack",
+"name": "SM_Sack",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Shotgun",
+"name": "SM_Shotgun",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Signpost",
+"name": "SM_Signpost",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_StartSign",
+"name": "SM_StartSign",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_TinCan",
+"name": "SM_TinCan",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Trough",
+"name": "SM_Trough",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_TunnelPortal",
+"name": "SM_TunnelPortal",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_TunnelSegment_20m",
+"name": "SM_TunnelSegment_20m",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_Wagon",
+"name": "SM_Wagon",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/SM_WantedBoard",
+"name": "SM_WantedBoard",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/props/WW_black",
+"name": "WW_black",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_brown",
+"name": "WW_brown",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_brown_dark",
+"name": "WW_brown_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_charcoal",
+"name": "WW_charcoal",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_cream",
+"name": "WW_cream",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_dynamite",
+"name": "WW_dynamite",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_fuse",
+"name": "WW_fuse",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_leather_dark",
+"name": "WW_leather_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_maroon",
+"name": "WW_maroon",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_red",
+"name": "WW_red",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_spark",
+"name": "WW_spark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_tan",
+"name": "WW_tan",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_tin",
+"name": "WW_tin",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_wood",
+"name": "WW_wood",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/props/WW_wood_dark",
+"name": "WW_wood_dark",
+"class": "MaterialInstanceConstant"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_BarrelCactus",
+"name": "SM_BarrelCactus",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Butte_A",
+"name": "SM_Butte_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Butte_B",
+"name": "SM_Butte_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_CowSkull",
+"name": "SM_CowSkull",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_DeadTree_A",
+"name": "SM_DeadTree_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_DeadTree_B",
+"name": "SM_DeadTree_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Fence",
+"name": "SM_Fence",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Mesa_A",
+"name": "SM_Mesa_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Mesa_B",
+"name": "SM_Mesa_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Mesa_C",
+"name": "SM_Mesa_C",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_PricklyPear_A",
+"name": "SM_PricklyPear_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_PricklyPear_B",
+"name": "SM_PricklyPear_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_RockArch",
+"name": "SM_RockArch",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_RockCluster_A",
+"name": "SM_RockCluster_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_RockCluster_B",
+"name": "SM_RockCluster_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Rock_A",
+"name": "SM_Rock_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Rock_B",
+"name": "SM_Rock_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Rock_C",
+"name": "SM_Rock_C",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Sagebrush_A",
+"name": "SM_Sagebrush_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Sagebrush_B",
+"name": "SM_Sagebrush_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Saguaro_A",
+"name": "SM_Saguaro_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Saguaro_B",
+"name": "SM_Saguaro_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Saguaro_C",
+"name": "SM_Saguaro_C",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_Tumbleweed",
+"name": "SM_Tumbleweed",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/scenery/SM_WagonWheel",
+"name": "SM_WagonWheel",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/setpieces/A_SK_Saloon_Anim",
+"name": "A_SK_Saloon_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/setpieces/A_SK_StationBell_Anim",
+"name": "A_SK_StationBell_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/setpieces/A_SK_Windmill_Anim",
+"name": "A_SK_Windmill_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_Saloon",
+"name": "SK_Saloon",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_Saloon_Skeleton",
+"name": "SK_Saloon_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_StationBell",
+"name": "SK_StationBell",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_StationBell_Skeleton",
+"name": "SK_StationBell_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_WaterTower",
+"name": "SK_WaterTower",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_WaterTowerWaterTower_idle",
+"name": "SK_WaterTowerWaterTower_idle",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_WaterTowerWaterTower_spout_swing",
+"name": "SK_WaterTowerWaterTower_spout_swing",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_WaterTower_Skeleton",
+"name": "SK_WaterTower_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_Windmill",
+"name": "SK_Windmill",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/setpieces/SK_Windmill_Skeleton",
+"name": "SK_Windmill_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/terrain/SM_TerrainTile_A",
+"name": "SM_TerrainTile_A",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/terrain/SM_TerrainTile_B",
+"name": "SM_TerrainTile_B",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/terrain/SM_TerrainTile_C",
+"name": "SM_TerrainTile_C",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/track/SM_TelegraphSpan_30m",
+"name": "SM_TelegraphSpan_30m",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/track/SM_Track_BufferStop",
+"name": "SM_Track_BufferStop",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/track/SM_Track_Straight_20m",
+"name": "SM_Track_Straight_20m",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/track/SM_Track_Trestle_20m",
+"name": "SM_Track_Trestle_20m",
+"class": "StaticMesh"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Caboose_Anim",
+"name": "A_SK_Train_Caboose_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Caboose_Bandit_Anim",
+"name": "A_SK_Train_Caboose_Bandit_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Flatcar_Crates_Anim",
+"name": "A_SK_Train_Flatcar_Crates_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Flatcar_Crates_Bandit_Anim",
+"name": "A_SK_Train_Flatcar_Crates_Bandit_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Flatcar_Gatling_Anim",
+"name": "A_SK_Train_Flatcar_Gatling_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Flatcar_Gatling_Bandit_Anim",
+"name": "A_SK_Train_Flatcar_Gatling_Bandit_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Flatcar_Logs_Anim",
+"name": "A_SK_Train_Flatcar_Logs_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Locomotive_Anim",
+"name": "A_SK_Train_Locomotive_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Locomotive_Bandit_Anim",
+"name": "A_SK_Train_Locomotive_Bandit_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_PassengerCar_Anim",
+"name": "A_SK_Train_PassengerCar_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_PassengerCar_Bandit_Anim",
+"name": "A_SK_Train_PassengerCar_Bandit_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/A_SK_Train_Tender_Anim",
+"name": "A_SK_Train_Tender_Anim",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar",
+"name": "SK_Train_Boxcar",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_BoxcarTrain_Boxcar_doors_open",
+"name": "SK_Train_BoxcarTrain_Boxcar_doors_open",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_BoxcarTrain_Boxcar_roll",
+"name": "SK_Train_BoxcarTrain_Boxcar_roll",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar_Bandit",
+"name": "SK_Train_Boxcar_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar_BanditTrain_Boxcar_Bandit_doors_open",
+"name": "SK_Train_Boxcar_BanditTrain_Boxcar_Bandit_doors_open",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar_BanditTrain_Boxcar_Bandit_roll",
+"name": "SK_Train_Boxcar_BanditTrain_Boxcar_Bandit_roll",
+"class": "AnimSequence"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar_Bandit_Skeleton",
+"name": "SK_Train_Boxcar_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Boxcar_Skeleton",
+"name": "SK_Train_Boxcar_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Caboose",
+"name": "SK_Train_Caboose",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Caboose_Bandit",
+"name": "SK_Train_Caboose_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Caboose_Bandit_Skeleton",
+"name": "SK_Train_Caboose_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Caboose_Skeleton",
+"name": "SK_Train_Caboose_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Crates",
+"name": "SK_Train_Flatcar_Crates",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Crates_Bandit",
+"name": "SK_Train_Flatcar_Crates_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Crates_Bandit_Skeleton",
+"name": "SK_Train_Flatcar_Crates_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Crates_Skeleton",
+"name": "SK_Train_Flatcar_Crates_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Gatling",
+"name": "SK_Train_Flatcar_Gatling",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Gatling_Bandit",
+"name": "SK_Train_Flatcar_Gatling_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Gatling_Bandit_Skeleton",
+"name": "SK_Train_Flatcar_Gatling_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Gatling_Skeleton",
+"name": "SK_Train_Flatcar_Gatling_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Logs",
+"name": "SK_Train_Flatcar_Logs",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Flatcar_Logs_Skeleton",
+"name": "SK_Train_Flatcar_Logs_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Locomotive",
+"name": "SK_Train_Locomotive",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Locomotive_Bandit",
+"name": "SK_Train_Locomotive_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Locomotive_Bandit_Skeleton",
+"name": "SK_Train_Locomotive_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Locomotive_Skeleton",
+"name": "SK_Train_Locomotive_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_PassengerCar",
+"name": "SK_Train_PassengerCar",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_PassengerCar_Bandit",
+"name": "SK_Train_PassengerCar_Bandit",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_PassengerCar_Bandit_Skeleton",
+"name": "SK_Train_PassengerCar_Bandit_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_PassengerCar_Skeleton",
+"name": "SK_Train_PassengerCar_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Tender",
+"name": "SK_Train_Tender",
+"class": "SkeletalMesh"
+},
+{
+"path": "/Game/IronHorse/train/SK_Train_Tender_Skeleton",
+"name": "SK_Train_Tender_Skeleton",
+"class": "Skeleton"
+},
+{
+"path": "/Game/IronHorse/train/WW_coal",
+"name": "WW_coal",
+"class": "MaterialInstanceConstant"
+}
+]
+}

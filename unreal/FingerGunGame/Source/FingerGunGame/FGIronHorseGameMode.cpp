@@ -134,16 +134,11 @@ void AFGIronHorseGameMode::Preload()
     // freeze whenever a new chunk type or enemy type appeared, and again after the garbage collector dropped one.
     // So: load all of it now, wait for the builds, and hold on to it.
     const double Start = FPlatformTime::Seconds();
-    IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
-    Registry.ScanPathsSynchronous({ TEXT("/Game/IronHorse") }, true);
-    TArray<FAssetData> Assets;
-    Registry.GetAssetsByPath(TEXT("/Game/IronHorse"), Assets, true);
-    for (const FAssetData& Data : Assets)
+    for (const FGAssets::FEntry& Entry : FGAssets::Manifest())
     {
-        const FName Class = Data.AssetClassPath.GetAssetName();
-        if (Class == TEXT("StaticMesh") || Class == TEXT("SkeletalMesh") || Class == TEXT("AnimSequence") || Class == TEXT("SoundWave"))
+        if (Entry.Class == TEXT("StaticMesh") || Entry.Class == TEXT("SkeletalMesh") || Entry.Class == TEXT("AnimSequence") || Entry.Class == TEXT("SoundWave"))
         {
-            if (UObject* Asset = Data.GetAsset()) { Preloaded.Add(Asset); }
+            if (UObject* Asset = LoadObject<UObject>(nullptr, *(Entry.Path + TEXT(".") + Entry.Name), nullptr, LOAD_NoWarn)) { Preloaded.Add(Asset); }
         }
     }
 #if WITH_EDITOR

@@ -5,6 +5,11 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Sound/SoundBase.h"
+#include "Dom/JsonObject.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 namespace
 {
@@ -39,27 +44,18 @@ UAnimSequence* FGAssets::Anim(const FString& Folder, const FString& MeshName, co
             return Found->Get();
         }
     }
-    IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
-    static bool bScanned = false;
-    if (!bScanned)
-    {
-        // -game starts before the background asset scan finishes
-        bScanned = true;
-        Registry.ScanPathsSynchronous({ FString(Root) }, true);
-    }
-    TArray<FAssetData> Assets;
-    Registry.GetAssetsByPath(FName(*FString::Printf(TEXT("%s/%s"), Root, *Folder)), Assets, false);
     // Interchange names takes "<Mesh><take>" ("SK_Banditaim_start", "SK_Train_BoxcarTrain_Boxcar_roll"),
     // and a file with a single take "<Mesh>_Anim". Shortest match wins, so "shoot" never picks "walk_shoot".
-    const FAssetData* Best = nullptr;
-    const FAssetData* OnlyTake = nullptr;
-    for (const FAssetData& Data : Assets)
+    const FString FolderPath = FString::Printf(TEXT("%s/%s/"), Root, *Folder);
+    const FEntry* Best = nullptr;
+    const FEntry* OnlyTake = nullptr;
+    for (const FEntry& Entry : Manifest())
     {
-        if (Data.AssetClassPath.GetAssetName() != TEXT("AnimSequence"))
+        if (Entry.Class != TEXT("AnimSequence") || !Entry.Path.StartsWith(FolderPath))
         {
             continue;
         }
-        FString Name = Data.AssetName.ToString();
+        FString Name = Entry.Name;
         Name.RemoveFromStart(TEXT("A_"));
         if (!Name.RemoveFromStart(MeshName))
         {
@@ -67,22 +63,48 @@ UAnimSequence* FGAssets::Anim(const FString& Folder, const FString& MeshName, co
         }
         if (Name == TEXT("_Anim") || Name == TEXT("Anim"))
         {
-            OnlyTake = &Data;
+            OnlyTake = &Entry;
         }
-        else if ((Name == Action || Name.EndsWith(TEXT("_") + Action)) && (!Best || Data.AssetName.ToString().Len() < Best->AssetName.ToString().Len()))
+        else if ((Name == Action || Name.EndsWith(TEXT("_") + Action)) && (!Best || Entry.Name.Len() < Best->Name.Len()))
         {
-            Best = &Data;
+            Best = &Entry;
         }
     }
     if (!Best)
     {
         Best = OnlyTake;
     }
-    UAnimSequence* Seq = Best ? Cast<UAnimSequence>(Best->GetAsset()) : nullptr;
+    UAnimSequence* Seq = Best ? LoadObject<UAnimSequence>(nullptr, *(Best->Path + TEXT(".") + Best->Name), nullptr, LOAD_NoWarn) : nullptr;
     if (!Seq)
     {
         UE_LOG(LogTemp, Warning, TEXT("IronHorse: no animation %s for %s"), *Action, *MeshName);
     }
     AnimCache.Add(Key, Seq);
     return Seq;
+}
+
+const TArray<FGAssets::FEntry>& FGAssets::Manifest()
+{
+    static TArray<FEntry> Entries;
+    static bool bLoaded = false;
+    if (!bLoaded)
+    {
+        bLoaded = true;
+        FString Text;
+        TSharedPtr<FJsonObject> Json;
+        const FString File = FPaths::ProjectContentDir() / TEXT("IronHorse/Data/assets.json");
+        if (FFileHelper::LoadFileToString(Text, *File) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Json) && Json)
+        {
+            for (const TSharedPtr<FJsonValue>& Value : Json->GetArrayField(TEXT("assets")))
+            {
+                const TSharedPtr<FJsonObject> Row = Value->AsObject();
+                Entries.Add({ Row->GetStringField(TEXT("path")), Row->GetStringField(TEXT("name")), Row->GetStringField(TEXT("class")) });
+            }
+        }
+        if (!Entries.Num())
+        {
+            UE_LOG(LogTemp, Error, TEXT("IronHorse: %s is missing or empty. Run Scripts/make_manifest.py."), *File);
+        }
+    }
+    return Entries;
 }

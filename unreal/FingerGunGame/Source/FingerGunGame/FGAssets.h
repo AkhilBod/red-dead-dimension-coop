@@ -15,4 +15,9 @@ namespace FGAssets
     /** The animation imported with MeshName whose name ends in _Action. */
     UAnimSequence* Anim(const FString& Folder, const FString& MeshName, const FString& Action);
     USoundBase* Sound(const FString& Name);
+
+    struct FEntry { FString Path; FString Name; FString Class; };
+    /** Everything under /Game/IronHorse, from Data/assets.json (Scripts/make_manifest.py). A packaged build's asset
+        registry returns nothing for these folders, so names are looked up here, not there. */
+    const TArray<FEntry>& Manifest();
 }
