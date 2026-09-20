@@ -151,6 +151,16 @@ class Config:
     anchor_beta: float = 2.0
     lean_full: float = 0.75             # sw of chest travel for lean = 1 (about a 30 cm sidestep)
     duck_full: float = 0.75             # sw of chest drop for duck = 1
+    # Head as well as shoulders. A lean is mostly the torso tipping: the head travels about half as far again as the
+    # shoulders do, and a duck tucks it down between them. So how far the head has moved RELATIVE to the chest is
+    # added on top of the chest's own travel. The face is often hidden behind the gun hand, so this fades in and out
+    # with how well the face is seen (never a jump), and with no face at all it is the old shoulders-only reading.
+    head_weight: float = 0.7            # how much of the head's extra sideways travel counts towards lean
+    # [rec] Much less for the duck: looking down at the screen tucks the head just like a duck does, and at 0.7 a seated
+    # player read as ducking 42% of the time instead of 15%.
+    head_weight_duck: float = 0.2
+    head_min_vis: float = 0.6
+    head_fade_s: float = 0.25
     lean_deadzone: float = 0.06         # keeps the game camera still while the player just stands there
     duck_deadzone: float = 0.10
     lean_min_cutoff: float = 1.5

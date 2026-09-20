@@ -1,8 +1,9 @@
 """Everything read from the body model: scale, chest anchor, lean, duck, speed.
 
-Lean and duck come from the shoulders, not the head. While aiming, the gun hand
-sits right in front of the face from the camera's point of view, so face
-landmarks are the first thing to get occluded. Shoulders almost never are.
+Lean and duck come from the shoulders first. While aiming, the gun hand sits right
+in front of the face from the camera's point of view, so face landmarks are the
+first thing to get occluded, and shoulders almost never are. The head adds to that
+when it can be seen (see head_weight in config.py).
 """
 import math
 
@@ -14,6 +15,7 @@ from windows import TimedWindow
 
 L_SHOULDER, R_SHOULDER = 11, 12
 L_WRIST, R_WRIST = 15, 16
+HEAD = (0, 2, 5, 7, 8)      # nose, eyes, ears
 CHAINS = {"L": (L_SHOULDER, L_WRIST), "R": (R_SHOULDER, R_WRIST)}
 
 
@@ -47,6 +49,8 @@ class BodyTracker:
         self.baseline_set = False
         self.still_ref = None
         self.still_since = 0.0
+        self.head_w = 0.0           # 0..1, how much the head is trusted right now
+        self.head_rel0 = None       # where the head sits relative to the chest when standing neutral, sw
 
     def recenter(self):
         self._recenter = True
@@ -119,6 +123,7 @@ class BodyTracker:
         if self._recenter:
             self.baseline_set, self._recenter = True, False
             self.neutral_x, self.stand_y = float(chest[0]), float(chest[1])
+            self.head_rel0 = None
         elif not self.baseline_set:
             self.neutral_x, self.stand_y = float(chest[0]), float(chest[1])
             if self.still_ref is None or np.linalg.norm(chest - self.still_ref) > cfg.settle_radius * self.sw:
@@ -126,14 +131,29 @@ class BodyTracker:
             elif t - self.still_since >= cfg.settle_s:
                 self.baseline_set, self.still_ref = True, None
 
-        raw_lean = (chest[0] - self.neutral_x) / (cfg.lean_full * self.sw)
-        raw_duck = (chest[1] - self.stand_y) / (cfg.duck_full * self.sw)
+        # The head's own extra travel, in shoulder widths, against where it sits when standing neutral.
+        seen = [i for i in HEAD if self.vis[i] >= cfg.head_min_vis]
+        extra = np.zeros(2)
+        want_w = 0.0
+        if len(seen) >= 2:
+            rel = (self.pts[seen].mean(axis=0) - chest) / self.sw
+            if self.head_rel0 is None or not self.baseline_set:
+                self.head_rel0 = rel.copy()
+            extra = rel - self.head_rel0
+            want_w = 1.0
+        self.head_w += (want_w - self.head_w) * min(1.0, dt / cfg.head_fade_s)
+        extra *= np.array([cfg.head_weight, cfg.head_weight_duck]) * self.head_w
+
+        raw_lean = (chest[0] - self.neutral_x + extra[0] * self.sw) / (cfg.lean_full * self.sw)
+        raw_duck = (chest[1] - self.stand_y + extra[1] * self.sw) / (cfg.duck_full * self.sw)
         lean = float(np.clip(self.lean_filter([raw_lean], t)[0], -1.0, 1.0))
         duck = float(np.clip(self.duck_filter([raw_duck], t)[0], 0.0, 1.0))
         self.lean = _deadzone(lean, cfg.lean_deadzone)
         self.duck = _deadzone(duck, cfg.duck_deadzone)
 
         # Baselines follow the player slowly so nobody ends up permanently leaning.
+        if len(seen) >= 2 and cfg.neutral_drift_s > 0 and abs(raw_lean) < 0.35 and raw_duck < 0.25:
+            self.head_rel0 += (rel - self.head_rel0) * min(1.0, dt / cfg.neutral_drift_s)
         if cfg.neutral_drift_s > 0 and abs(raw_lean) < 0.35:
             self.neutral_x += (chest[0] - self.neutral_x) * min(1.0, dt / cfg.neutral_drift_s)
         if chest[1] < self.stand_y:
