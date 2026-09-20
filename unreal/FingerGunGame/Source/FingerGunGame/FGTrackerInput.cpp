@@ -386,6 +386,7 @@ void UFGTrackerInput::SendOsc(const char* Address, const TArray<float>& Args)
 void UFGTrackerInput::SendCalibBegin() { SendOsc("/fg/calib/begin", {}); }
 void UFGTrackerInput::SendCalibTarget(float X, float Y) { SendOsc("/fg/calib/target", { X, Y }); }
 void UFGTrackerInput::SendRecenter() { SendOsc("/fg/recenter", {}); }
+void UFGTrackerInput::SendHit() { SendOsc("/fg/hit", { 1.0f }); }
 void UFGTrackerInput::SendAimMode(bool bFinger) { SendOsc("/fg/aim_mode", { bFinger ? 1.0f : 0.0f }); }
 
 void UFGTrackerInput::Recenter()

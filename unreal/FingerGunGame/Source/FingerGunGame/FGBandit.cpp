@@ -211,11 +211,8 @@ void AFGBandit::Tick(float DeltaTime)
         }
         Local += DeadVelocity * DeltaTime;
         Local.Z = FMath::Max(Local.Z, bRider ? 0.0f : -20.0f);
-        if (bRider && Horse)
-        {
-            // The horse carries on without him and peels away.
-            Horse->AddWorldOffset(FVector(-DeadVelocity.X * DeltaTime * 0.9f, Side * 260.0f * DeltaTime, 0.0f));
-        }
+        // (The horse is part of this actor, so it pulls up and is left behind with him. It used to gallop on
+        // riderless, straight out over the next canyon.)
         SetActorLocation((FTransform(Local) * AnchorTransform()).GetLocation());
         if (StateTime > 4.0f) { Destroy(); }
         return;
@@ -296,9 +293,27 @@ void AFGBandit::Tick(float DeltaTime)
         break;
 
     case EFGBanditState::Leaving:
-        Local.X -= (bRider ? 1500.0f : 0.0f) * DeltaTime;
-        if (!bRider) { Local.Z -= 400.0f * DeltaTime; }
-        if (StateTime > 3.5f) { Destroy(); return; }
+        if (bRider)
+        {
+            // Reins in: drops back at up to the train's own speed, which is standing still on the ground.
+            DeadVelocity.X = FMath::FInterpTo(DeadVelocity.X, -Game->TrainSpeed * 100.0f, DeltaTime, 1.2f);
+            Local.X += DeadVelocity.X * DeltaTime;
+            if (StateTime > 5.0f) { Destroy(); return; }
+        }
+        else if (Spec.Kind == EFGBanditKind::Boarder || Spec.Kind == EFGBanditKind::Boss || !Spec.Anchor)
+        {
+            // Bails out over the side of our train.
+            DeadVelocity.Y = Side * 380.0f;
+            DeadVelocity.Z -= 980.0f * DeltaTime;
+            if (Local.Z < Spec.Slot.Z - 150.0f) { DeadVelocity.X = FMath::FInterpTo(DeadVelocity.X, -Game->TrainSpeed * 100.0f, DeltaTime, 3.0f); }
+            Local += DeadVelocity * DeltaTime;
+            if (StateTime > 3.0f) { Destroy(); return; }
+        }
+        else if (StateTime > 20.0f)
+        {
+            Destroy();          // crew of the other train: they just ride it away as it drops behind
+            return;
+        }
         break;
 
     case EFGBanditState::Scripted:

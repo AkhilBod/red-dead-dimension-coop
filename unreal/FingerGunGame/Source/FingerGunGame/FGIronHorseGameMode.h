@@ -78,6 +78,7 @@ public:
     int32 BossesBeaten = 0;
     double DistanceM = 0.0;
     bool bStayDown = false;             // in a tunnel
+    float LeanWarning = 0.0f;           // -1 lean left, +1 lean right, 0 nothing coming
     FString Banner;
     float BannerTime = 0.0f;
     EFGPhase Phase = EFGPhase::Title;
@@ -181,7 +182,11 @@ private:
     float NightTarget = 0.0f;
     float SkyKey = -10.0f;
     float SunChainYaw = 150.0f;         // where the sun stands in the landscape, not relative to the train
-    float QuietTime = 0.0f;             // seconds with nobody to shoot at
+    float QuietTime = 0.0f;
+    float ObstacleTimer = 12.0f;
+    float LastLeanDistance = -1.0f;
+    bool bMusic = false;                // -FGMusic turns the three loops on
+    void TickLeanObstacles(float DeltaTime);             // seconds with nobody to shoot at
     TFunction<FTransform()> OnOwnCar(int32 CarIndex) const;
     // showdown
     int32 ShowdownStep = 0;

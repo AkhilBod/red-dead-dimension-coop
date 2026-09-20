@@ -88,8 +88,10 @@ void AFGIronHorseGameMode::BeginPlay()
         TrainLoop = UGameplayStatics::SpawnSound2D(this, Loop, 0.0f, 1.0f, 0.0f, nullptr, false, false);
     }
 
+    // Played with it on: the team preferred the train and the guns on their own. -FGMusic brings the loops back.
+    bMusic = FParse::Param(FCommandLine::Get(), TEXT("FGMusic"));
     const TCHAR* Tracks[3] = { TEXT("music_day"), TEXT("music_night"), TEXT("music_boss") };
-    for (int32 i = 0; i < 3; ++i)
+    for (int32 i = 0; bMusic && i < 3; ++i)
     {
         if (USoundBase* Track = FGAssets::Sound(Tracks[i]))
         {
@@ -318,6 +320,8 @@ void AFGIronHorseGameMode::SetPhase(EFGPhase NewPhase)
     case EFGPhase::Showdown:
         EveryoneLeave();
         World->bStraightOnly = true;
+        World->bAllowRandomLandmarks = false;
+        World->ClearQueue();            // no tunnel, canyon or bridge turning up in the middle of a duel
         ShowdownStep = 0;
         ShowdownTimer = 3.0f;
         Prompt = TEXT("");
@@ -485,6 +489,7 @@ void AFGIronHorseGameMode::BeginLap(int32 NewLap)
     PhaseTime = 0.0f;
     Prompt = SubPrompt = TEXT("");
     World->bStraightOnly = false;
+    World->bAllowRandomLandmarks = true;
     NextStage(EFGStage::Riders);
     SpawnTimer = Lap == 0 ? 8.0f : 3.0f;
     if (Player->WeaponIndex != Lap % 4 || Lap > 0) { Player->SetWeapon(Lap); }      // a new gun every lap
@@ -635,6 +640,7 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
     TickMagnet(DeltaTime);
     TickShots(DeltaTime);
     TickDuck();
+    TickLeanObstacles(DeltaTime);
     TickAtmosphere(DeltaTime);
 }
 
@@ -822,10 +828,11 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
         if (bTimeUp)
         {
             if (StageFlags == 0) { StageFlags = 1; EveryoneLeave(); }
-            BanditTrain->Offset = FMath::FInterpTo(BanditTrain->Offset, -500.0, DeltaTime, 0.35f);
-            if (BanditTrain->IsHidden() || BanditTrain->Offset < -300.0)
+            // It loses ground slowly, a few metres a second, and slips out of sight behind us. It used to shoot backwards
+            // at 180 m/s, which read as vanishing. The duel starts once it is behind the camera; it is hidden later.
+            BanditTrain->Offset = FMath::FInterpConstantTo(BanditTrain->Offset, -200.0, DeltaTime, 7.0f + TrainSpeed * 0.12f);
+            if (BanditTrain->IsHidden() || BanditTrain->Offset < -45.0)
             {
-                BanditTrain->SetActorHiddenInGame(true);
                 for (AFGTarget* T : Targets) { if (T && T->bExplosive && T->Local.Y == 0.0f) { T->Destroy(); } }      // the ones on the other train
                 SetPhase(EFGPhase::Showdown);
             }
@@ -839,15 +846,15 @@ void AFGIronHorseGameMode::TickShowdown(float DeltaTime)
 {
     if (!BanditTrain->IsHidden())
     {
-        BanditTrain->Offset = FMath::FInterpTo(BanditTrain->Offset, -500.0, DeltaTime, 0.35f);
-        if (BanditTrain->Offset < -350.0) { BanditTrain->SetActorHiddenInGame(true); }
+        BanditTrain->Offset = FMath::FInterpConstantTo(BanditTrain->Offset, -200.0, DeltaTime, 7.0f + TrainSpeed * 0.12f);
+        if (BanditTrain->Offset < -110.0) { BanditTrain->SetActorHiddenInGame(true); }
     }
     ShowdownTimer -= DeltaTime;
     const FFGTrackerState& In = Player->Tracker->State;
     switch (ShowdownStep)
     {
-    case 0:     // quiet, then he lands
-        if (ShowdownTimer <= 0.0f)
+    case 0:     // quiet, then he lands. Not until everything already laid ahead (450 m) is plain open track.
+        if (ShowdownTimer <= 0.0f && !World->EventsWithin(500.0f))
         {
             FFGBanditSpec Spec;
             Spec.Kind = EFGBanditKind::Boss;
@@ -928,10 +935,9 @@ bool AFGIronHorseGameMode::HandleUiShot(FVector2D Aim)
 {
     if (Phase != EFGPhase::Result) { return false; }
     PlaySfx(TEXT("shot_player"));
-    if (RideAgainButton().ExpandBy(0.03).IsInside(Aim))
-    {
-        UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this)));
-    }
+    // Any shot restarts, not only one on the button: a dead player has no steady crosshair, and the booth must never
+    // need a keyboard.
+    UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this)));
     return true;
 }
 
@@ -1259,6 +1265,7 @@ void AFGIronHorseGameMode::HurtPlayer(const TCHAR* Sfx)
     if (bPlayerDead || bGod || InvulnerableFor > 0.0f || Phase == EFGPhase::Result) { return; }
     InvulnerableFor = 1.5f;
     PlaySfx(Sfx);
+    Player->Tracker->SendHit();
     const int32 Before = Player->Hats;
     const bool bDead = Player->TakeHit();
     if (Before == 3)
@@ -1289,6 +1296,33 @@ void AFGIronHorseGameMode::TickDuck()
         else { ++Dodges; Score += 50; PlaySfx(TEXT("whiz"), 1.0f, 0.6f); }
     }
     LastDuckDistance = D;
+}
+
+void AFGIronHorseGameMode::TickLeanObstacles(float DeltaTime)
+{
+    // Signal arms over one half of the roof: lean to the other side. Every 9-16 s of open running, never near a
+    // tunnel, bridge, canyon or another duck, and never in a duel.
+    float Side = 0.0f;
+    const float D = World->MetresToLeanObstacle(Side);
+    const bool bRiding = Phase == EFGPhase::Ride && TrainSpeed > 10.0f;
+    ObstacleTimer -= bRiding ? DeltaTime : 0.0f;
+    const float Ahead = FMath::Max(TrainSpeed, 15.0f) * 4.5f;
+    if (bRiding && ObstacleTimer <= 0.0f && D < 0.0f && !World->EventsWithin(Ahead + 120.0f))
+    {
+        ObstacleTimer = FMath::FRandRange(9.0f, 16.0f) * FMath::Max(0.6f, 1.0f - 0.1f * Lap);
+        World->AddLeanObstacle(Ahead, FMath::RandBool() ? 1.0f : -1.0f);
+    }
+    // The arm is over the Side half, so the warning points the other way.
+    LeanWarning = D > 0.0f && D < FMath::Max(TrainSpeed, 8.0f) * 2.8f ? -Side : 0.0f;
+    const float Here = PlayerForwardCm / 100.0f;
+    if (LastLeanDistance > Here && D >= 0.0f && D <= Here)
+    {
+        // The arm covers from the centreline outwards on its side, at standing and ducked head height alike.
+        const float HeadY = Player->HeadLocation().Y * Side;
+        if (HeadY > -30.0f) { HurtPlayer(TEXT("bonk")); }
+        else { ++Dodges; Score += 50; PlaySfx(TEXT("whiz"), 1.0f, 0.6f); }
+    }
+    LastLeanDistance = D;
 }
 
 void AFGIronHorseGameMode::TickAtmosphere(float DeltaTime)

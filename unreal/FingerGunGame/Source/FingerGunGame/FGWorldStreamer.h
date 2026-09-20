@@ -79,6 +79,14 @@ public:
 
     bool bAllowRandomLandmarks = true;
 
+    /** A post beside the line with an arm out over half the roof, Ahead metres up the track. Side +1 = arm over the right half. */
+    void AddLeanObstacle(double Ahead, float Side);
+    /** Nearest one still ahead: metres to it, and which side its arm is on. -1 if none. */
+    float MetresToLeanObstacle(float& OutSide) const;
+    void ClearQueue() { Pending.Reset(); }
+    /** Anything with an event (duck, dark, trestle, narrow, side track) within this many metres ahead? */
+    bool EventsWithin(float Metres) const;
+
     /** Only straight chunks for now (the showdown: the sun has to stay put behind the boss). */
     bool bStraightOnly = false;
 
@@ -106,6 +114,9 @@ private:
     const FFGChunkDef* PickNext();
     void Append(const FFGChunkDef* Def);
     void BuildTown(FFGPlacedChunk& Placed);
+
+    struct FLeanObstacle { double S; float Side; TArray<TObjectPtr<USceneComponent>> Parts; };
+    TArray<FLeanObstacle> LeanObstacles;
     bool bNextIsTown = false;
 
     UPROPERTY()

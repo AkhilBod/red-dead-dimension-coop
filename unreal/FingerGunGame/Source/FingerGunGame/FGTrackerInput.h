@@ -65,6 +65,7 @@ public:
     void SendCalibTarget(float ScreenX, float ScreenY);
     void SendRecenter();
     void SendAimMode(bool bFinger);
+    void SendHit();         // the glove buzzes its hit pattern
 
     /** Space: the player has moved or the camera got bumped. Here and now becomes neutral stance and screen centre. */
     void Recenter();

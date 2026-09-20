@@ -16,7 +16,7 @@ namespace
     const FFGWeapon Weapons[] = {
         //  name            prop                      len  rounds  cooldown  damage  hits  assist  tracers  pitch
         { TEXT("REVOLVER"),   nullptr,                   0.0f, 6, 0.25f, 25.0f, 1, 1.0f, 1, 1.00f },
-        { TEXT("SHOTGUN"),    TEXT("SM_Shotgun"),       87.0f, 4, 0.55f, 50.0f, 3, 1.7f, 6, 0.72f },   // wide, takes a cluster, slow, four shells
+        { TEXT("SHOTGUN"),    TEXT("SM_Shotgun"),       87.0f, 2, 0.45f, 50.0f, 6, 2.8f, 8, 0.72f },   // double barrel: two shells, a 20 degree cone, everyone in it
         { TEXT("RIFLE"),      TEXT("SM_Rifle"),        100.0f, 8, 0.35f, 50.0f, 2, 1.0f, 1, 1.25f },   // drops a heavy in one, goes through to the man behind
         { TEXT("LONG COLT"),  TEXT("SM_Revolver_Long"), 44.0f, 7, 0.20f, 25.0f, 1, 1.15f, 1, 1.10f },  // quick, seven rounds
     };

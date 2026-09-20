@@ -267,6 +267,57 @@ void AFGWorldStreamer::BuildTown(FFGPlacedChunk& Placed)
     }
 }
 
+void AFGWorldStreamer::AddLeanObstacle(double Ahead, float Side)
+{
+    // Timber post at the trackside, arm reaching over one half of the car roof at head height, a lantern on the end.
+    // Built from a crate mesh scaled into beams: no new art needed.
+    FLeanObstacle& Ob = LeanObstacles.AddDefaulted_GetRef();
+    Ob.S = S + Ahead;
+    Ob.Side = Side;
+    const FTransform Frame = ChainPose(Ob.S);
+    auto Piece = [this, &Ob, &Frame](const TCHAR* Mesh, const FVector& At, const FVector& Scale)
+    {
+        UStaticMeshComponent* Comp = NewObject<UStaticMeshComponent>(this);
+        Comp->SetMobility(EComponentMobility::Movable);
+        Comp->SetStaticMesh(FGAssets::StaticMesh(TEXT("props"), Mesh));
+        Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Comp->SetupAttachment(ChainRoot);
+        Comp->SetRelativeTransform(FTransform(FRotator::ZeroRotator, At, Scale) * Frame);
+        Comp->RegisterComponent();
+        Ob.Parts.Add(Comp);
+        LiveDressing.Add(Comp);
+    };
+    // SM_Crate_Small is 65 x 65 x 60 cm with its origin on the floor.
+    Piece(TEXT("SM_Crate_Small"), FVector(0.0f, Side * 290.0f, 0.0f), FVector(0.4f, 0.4f, 11.2f));              // post, 6.7 m
+    Piece(TEXT("SM_Crate_Small"), FVector(0.0f, Side * 150.0f, 565.0f), FVector(0.45f, 4.6f, 1.3f));            // arm: y 0..300, z 5.65..6.4
+    Piece(TEXT("SM_Crate_Small"), FVector(0.0f, Side * 215.0f, 430.0f), FVector(0.3f, 0.3f, 2.4f));             // brace
+    Piece(TEXT("SM_Lantern"), FVector(-10.0f, Side * 25.0f, 520.0f), FVector(2.0f));
+}
+
+float AFGWorldStreamer::MetresToLeanObstacle(float& OutSide) const
+{
+    float Best = -1.0f;
+    for (const FLeanObstacle& Ob : LeanObstacles)
+    {
+        const float D = float(Ob.S - S);
+        if (D >= -2.0f && (Best < 0.0f || D < Best)) { Best = FMath::Max(D, 0.0f); OutSide = Ob.Side; }
+    }
+    return Best;
+}
+
+bool AFGWorldStreamer::EventsWithin(float Metres) const
+{
+    for (const FFGPlacedChunk& C : Chain)
+    {
+        for (const FFGChunkEvent& E : C.Def->Events)
+        {
+            if (E.Kind == TEXT("station") || E.Kind == TEXT("overhead")) { continue; }
+            if (C.StartS + E.S1 >= S - 5.0 && C.StartS + E.S0 <= S + Metres) { return true; }
+        }
+    }
+    return false;
+}
+
 float AFGWorldStreamer::WorldYaw() const
 {
     return ChainRoot->GetComponentRotation().Yaw;
@@ -332,6 +383,14 @@ void AFGWorldStreamer::SetDistance(double NewS)
     while (Chain.Num() > 1 && Chain[0].StartS + ChunkMetres < S - KeepBehind)
     {
         DropFirst();
+    }
+    for (int32 i = LeanObstacles.Num() - 1; i >= 0; --i)
+    {
+        if (LeanObstacles[i].S < S - KeepBehind)
+        {
+            for (USceneComponent* Part : LeanObstacles[i].Parts) { LiveDressing.Remove(Part); Part->DestroyComponent(); }
+            LeanObstacles.RemoveAt(i);
+        }
     }
     ChainRoot->SetWorldTransform(ChainPose(S).Inverse());
 }
