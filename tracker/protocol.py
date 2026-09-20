@@ -11,6 +11,7 @@ PORT_TO_TRACKER = 7001
 ADDR_STATE = "/fg/state"
 ADDR_FIRE = "/fg/fire"
 ADDR_RELOAD = "/fg/reload"
+ADDR_STATE2 = "/fg/state2"            # second gun: [aimX, aimY, valid, primaryIsOnTheRight]. /fg/fire carries a third arg: 0 = first gun, 1 = second
 ADDR_CALIB_BEGIN = "/fg/calib/begin"
 ADDR_CALIB_TARGET = "/fg/calib/target"
 ADDR_RECENTER = "/fg/recenter"

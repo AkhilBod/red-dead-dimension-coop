@@ -48,7 +48,23 @@ class Pipeline:
         # With the hands together a kick can only be a slap, so it may be a gentler one than a shot needs.
         self.slap_kick = FlickTrigger(cfg, cfg.slap_kick_m)
         self.off_flick = FlickTrigger(cfg, cfg.slap_kick_m)     # the other hand's kicks only ever mean "reload"
+        self.pump = FlickTrigger(cfg, cfg.pump_rise_m)
         self.reload = ReloadDetector(cfg)
+        # The second gun (dual wield). A lighter copy of the first gun's chain: own filter, centre, history, trigger.
+        self.mapper2 = AimMapper(cfg)
+        self.history2 = AimHistory()
+        self.aim_filter2 = OneEuro(cfg.aim_min_cutoff, cfg.aim_beta, cfg.aim_d_cutoff)
+        self.scale2 = TimedWindow(cfg.hand_scale_window_s)
+        self.thumb2 = ThumbTrigger(cfg)
+        self.pump2 = FlickTrigger(cfg, cfg.pump_rise_m)
+        self.g2_seen_t = -1e9
+        self.g2_lock_t = None
+        self.g2_center = None
+        self.g2_speed = 0.0
+        self.g2_ref = None
+        self.g2_last_fire_t = -1e9
+        self.aim2 = (0.5, 0.5)
+        self.state2 = [0.5, 0.5, 0.0, 1.0]
         self.aim = (0.5, 0.5)
         self.gun_pos = None
         self.gun_center = None
@@ -206,8 +222,13 @@ class Pipeline:
         events.append(("fire", x, y, kind))
         self.last_fire_t, self.last_fire_kind = t, kind
 
-    def _reload(self, events, t):
+    def _reload(self, events, t, kind="slap"):
         self.pending_kick = None
+        want = self.cfg.reload_gesture
+        if want != "both" and want != kind:
+            return
+        if kind == "pump" and t - max(self.last_fire_t, self.g2_last_fire_t) < self.cfg.pump_after_fire_s:
+            return
         if self.reload.can_reload(t):
             self.reload.mark_reload(t)
             events.append(("reload",))
@@ -216,6 +237,50 @@ class Pipeline:
         cfg = self.cfg
         onset = max(onset, t - cfg.rewind_max_s)
         return self.history.settled_before(onset - cfg.rewind_margin_s, cfg.rewind_window_s, cfg.rewind_still_speed, read_at=onset)
+
+    def _second_gun(self, h, first, t, aspect, aim_anchor, chest_scale, events):
+        cfg = self.cfg
+        if h is None:
+            self.state2[2] = float(t - self.g2_seen_t <= cfg.aim_hold_s)
+            return
+        if t - self.g2_seen_t > cfg.gun_unlock_s:
+            self.aim_filter2.reset()
+            self.history2.clear()
+            self.scale2.clear()
+            self.thumb2.reset()
+            self.pump2.reset()
+            self.mapper2.forget_center()
+            self.g2_ref, self.g2_center, self.g2_speed, self.g2_lock_t = None, None, 0.0, t
+        dt = min(0.1, t - self.g2_seen_t)
+        self.scale2.push(t, h.scale)
+        scale = self.scale2.median()
+        tip = h.p2[INDEX_TIP]
+        if cfg.aim_mode == "finger":
+            travel = np.array([tip[0] / aspect, tip[1]])
+        else:
+            if self.g2_ref is None:
+                self.g2_ref = (tip.copy(), aim_anchor.copy())
+            travel = (tip - self.g2_ref[0]) / scale - (aim_anchor - self.g2_ref[1]) / chest_scale
+        raw = self.aim_filter2(travel, t)
+        self.history2.push(t, raw)
+        if self.g2_center is not None and dt > 0:
+            self.g2_speed += (_dist(h.center, self.g2_center) / dt / scale - self.g2_speed) * 0.5
+        self.g2_center, self.g2_seen_t = h.center, t
+        if not self.mapper2.centered and (self.g2_speed < cfg.aim_settle_speed or t - self.g2_lock_t >= cfg.aim_settle_max_s) and t - self.g2_lock_t >= cfg.aim_settle_s:
+            self.mapper2.center_on(raw)
+        self.aim2 = self.mapper2.map(raw, dt if self.g2_speed < cfg.aim_push_max_speed else 0.0)
+        self.state2 = [self.aim2[0], self.aim2[1], 1.0, float(first.wrist[0] >= h.wrist[0])]
+
+        tip_rise = (h.p2[WRIST][1] - tip[1]) / scale
+        if self.pump2.update(t, tip_rise) is not None:
+            self._reload(events, t, "pump")
+        onset = self.thumb2.update(t, thumb_feature(h.hand), self.g2_speed < cfg.thumb_max_speed)
+        if onset is not None and t - self.g2_last_fire_t >= cfg.fire_cooldown_s and not self.reload.fire_suppressed(t):
+            onset = max(onset, t - cfg.rewind_max_s)
+            then = self.history2.settled_before(onset - cfg.rewind_margin_s, cfg.rewind_window_s, cfg.rewind_still_speed, read_at=onset)
+            x, y = self.mapper2.map(then)
+            events.append(("fire", x, y, "thumb", 1))
+            self.g2_last_fire_t = t
 
     def _lead(self, raw):
         """Where the hand is by now, not where the camera saw it a frame or two ago."""
@@ -315,11 +380,13 @@ class Pipeline:
             # While the hands are together (a reload) the tracked hand may be the wrong one, so the
             # crosshair holds still. And only a hand moving at a human pace may push the mapping off
             # a screen edge: a tracking jump must not drag the centre away with it.
-            if hands_apart:
+            if hands_apart or cfg.reload_gesture == "pump":
                 self.aim = self.mapper.map(raw, dt if self.hand_speed < cfg.aim_push_max_speed else 0.0)
 
             tip_rise = (gun.p2[WRIST][1] - gun.p2[INDEX_TIP][1]) / scale
             kick_onset = self.flick.update(t, tip_rise)
+            if self.pump.update(t, tip_rise) is not None:
+                self._reload(events, t, "pump")
             if self.slap_kick.update(t, tip_rise) is not None and self.reload.together(t):
                 self._reload(events, t)
             steady = self.hand_speed < cfg.thumb_max_speed and self.flick.swing(cfg.thumb_swing_s) < cfg.thumb_max_swing
@@ -358,6 +425,9 @@ class Pipeline:
                 raw_then, self.pending_kick = self.pending_kick[1], None
                 if cfg.flick_enabled:
                     self._fire(events, t, raw_then, "flick")
+
+        second = off if (cfg.dual_wield and gun is not None and off is not None and off.raised and not off.open and hands_apart) else None
+        self._second_gun(second, gun, t, aspect, aim_anchor, chest_scale, events)
 
         scale_now = self.gun_scale.median() if self.gun_scale.buf else chest_scale
         if self.reload.approach(t, gun.wrist if gun else None, off.center if (gun and off) else None, scale_now, sw):

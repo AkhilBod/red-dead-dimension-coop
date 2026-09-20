@@ -49,7 +49,9 @@ class Config:
     aim_settle_speed: float = 0.25      # m/s. Once the raised hand is slower than this...
     aim_settle_s: float = 0.2           # ...for this long, where it points is the middle of the screen
     aim_settle_max_s: float = 0.8       # never settles (player firing at once): use wherever it is by then
-    aim_recenter_after_s: float = 2.0   # gun hand gone this long: learn the centre again when it comes back
+    # Played live: after a dodge the hand came back somewhere else and it was "hard to get back in". A hand that has
+    # been out of sight for longer than a tracking blip now always starts again from the middle of the screen.
+    aim_recenter_after_s: float = 0.6   # gun hand gone this long: learn the centre again when it comes back
     aim_push_max_speed: float = 1.2     # m/s. Faster than this is a tracking jump, not a hand held past the screen edge
     calib_gain_min: float = 0.5         # calibration may scale the sensitivity by this much, no more
     calib_gain_max: float = 2.0
@@ -120,6 +122,14 @@ class Config:
     # --- Reload slap ---------------------------------------------------------
     # [rec] offset between the two hands in sw: slapping = within about 0.3 sideways,
     # shooting one-handed = 0.9-1.7 apart sideways.
+    # How to reload. "pump": jerk the muzzle up (elbow drops, forearm swings up), one hand, works while dual wielding.
+    # It is the old recoil-kick detector, which was tuned on recordings, doing a job where a false alarm costs nothing.
+    # "slap": the other hand slaps the gun hand from below. "both": either.
+    # Played live: the one-handed pump lost to the slap, which is back as the default.
+    reload_gesture: str = "slap"
+    pump_rise_m: float = 0.06           # fingertip rise over the wrist that counts. [rec] deliberate kicks rose 0.06-0.10
+    pump_after_fire_s: float = 0.5      # a shot's own recoil jerk is not a reload
+    dual_wield: bool = False            # tried and dropped. On, a second hand in gun shape is a second gun with its own crosshair and trigger
     slap_together_dx: float = 0.5
     slap_together_dy: float = 1.1
     slap_maybe_dx: float = 0.75         # close enough to wait a moment before calling a kick a shot
@@ -167,7 +177,9 @@ class Config:
             if key not in names:
                 raise SystemExit(f"unknown config key '{key}'")
             current = getattr(self, key)
-            if isinstance(current, bool):
+            if isinstance(current, str):
+                value = raw
+            elif isinstance(current, bool):
                 value = raw.lower() in ("1", "true", "yes", "on")
             else:
                 value = int(float(raw)) if isinstance(current, int) else float(raw)

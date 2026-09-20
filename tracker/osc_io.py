@@ -27,8 +27,11 @@ class OscOut:
     def state(self, state):
         self._send(P.ADDR_STATE, state.to_floats())
 
-    def fire(self, x, y):
-        self._send(P.ADDR_FIRE, [x, y])
+    def state2(self, values):
+        self._send(P.ADDR_STATE2, values)
+
+    def fire(self, x, y, hand=0):
+        self._send(P.ADDR_FIRE, [x, y, hand])
 
     def reload(self):
         self._send(P.ADDR_RELOAD, [1.0])

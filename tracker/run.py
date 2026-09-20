@@ -228,10 +228,12 @@ class Tracker(threading.Thread):
                 state, events = pipeline.update(frame)
                 self.calib.update(pipeline)
                 self.out.state(state)
+                self.out.state2(pipeline.state2)
                 for e in events:
                     if e[0] == "fire":
-                        self.out.fire(e[1], e[2])
-                        print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})  {e[3]}")
+                        hand = e[4] if len(e) > 4 else 0
+                        self.out.fire(e[1], e[2], hand)
+                        print(f"[{frame.t:9.2f}] FIRE   ({e[1]:.3f}, {e[2]:.3f})  {e[3]}{'  (second gun)' if hand else ''}")
                         if glove and e[3] != "button":
                             glove.send(FIRE)        # the switch already buzzed by itself
                     else:

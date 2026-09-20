@@ -2,6 +2,8 @@
 
 Webcam in, OSC out. The game (Unreal) listens on UDP **7000**. The tracker listens on **7001**. The small camera picture the game shows in its corner goes to **7002** as JPEG slices ([preview.py](preview.py), `--no-preview` turns it off).
 
+Reload is the two-handed slap (`reload_gesture=slap`). `pump` = jerk the muzzle up with one hand instead, `both` allows either. `dual_wield` (off by default) makes a second hand in gun shape a second gun: `/fg/state2 [x, y, valid, firstGunOnRight]`, and `/fg/fire` gains a third arg, 0 or 1.
+
 Two aim models, `--set aim_mode=finger` or **P** in the game: `travel` (default) measures how far the fingertip has moved from a learned centre, `finger` puts the crosshair where the fingertip is in the camera picture (`finger_gain` sets how much of the picture covers the screen). **Space** in the game sends `/fg/recenter`.
 
 With the game: `../play.sh` from the repo root starts both. By hand: `.venv/bin/python run.py --no-window` (the venv, not conda's python).
