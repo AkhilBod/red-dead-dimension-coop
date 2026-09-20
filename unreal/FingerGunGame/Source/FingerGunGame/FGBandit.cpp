@@ -287,7 +287,7 @@ void AFGBandit::Tick(float DeltaTime)
             if (bRider) { Play(TEXT("ride_gallop"), true); }
             else if (Spec.Kind == EFGBanditKind::Boarder) { Play(TEXT("cover_idle"), true); }
             else { Play(Spec.Mesh == TEXT("SK_Rifleman") || Spec.Mesh == TEXT("SK_Heavy") ? TEXT("rifle_idle") : TEXT("idle"), true); }
-            Timer = FMath::FRandRange(1.6f, 3.4f) * Game->FireDelayScale();
+            Timer = FMath::FRandRange(2.0f, 3.8f) * Game->FireDelayScale();
             SetState(EFGBanditState::Idle);
         }
         break;
