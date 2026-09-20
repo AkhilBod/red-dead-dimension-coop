@@ -47,8 +47,9 @@ class Camera:
                 self.cap = cv2.VideoCapture(index, backend)
         if sys.platform == "win32":
             self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))   # 720p30 needs MJPG on most webcams
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        if width is not None and height is not None:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.cap.isOpened():
@@ -286,6 +287,7 @@ def main():
     ap.add_argument("--camera", type=int, default=0)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
+    ap.add_argument("--native-camera", action="store_true", help="keep the camera's native resolution")
     ap.add_argument("--fps", type=int, default=60, help="camera frame rate to ask for. More = fresher frames = less lag. "
                     "Cameras that cannot do it just give what they have")
     ap.add_argument("--pose-every", type=int, default=1, help="run the body model at most every Nth frame")
@@ -304,7 +306,8 @@ def main():
     cfg = Config()
     cfg.apply_overrides(args.set)
     # The camera is opened here, on the main thread: macOS can only show its permission prompt from it.
-    camera = None if args.replay else Camera(args.camera, args.width, args.height, args.fps)
+    camera = None if args.replay else Camera(args.camera, None if args.native_camera else args.width,
+                                             None if args.native_camera else args.height, args.fps)
     tracker = Tracker(args, cfg, camera)
     tracker.start()
 
