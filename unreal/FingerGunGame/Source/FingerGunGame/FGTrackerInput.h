@@ -1,0 +1,90 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "FGTrackerInput.generated.h"
+
+class FSocket;
+class UTexture2D;
+
+/** /fg/state, in wire order. See PLAN.md section 4. */
+struct FFGTrackerState
+{
+    float AimX = 0.5f;
+    float AimY = 0.5f;
+    bool bAimValid = false;
+    bool bGunPose = false;
+    bool bHolstered = false;
+    float Lean = 0.0f;
+    float Duck = 0.0f;
+    float BodySpeed = 0.0f;
+    bool bTracking = false;
+    bool bOffHandOpen = false;
+};
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FFGFireEvent, FVector2D);
+DECLARE_MULTICAST_DELEGATE(FFGReloadEvent);
+
+/**
+ * The seam to the Python tracker. OSC over UDP on 7000 (state, fire, reload), commands back on 7001,
+ * and the tracker's camera preview as JPEG fragments on 7002.
+ * With no tracker running it falls back to mouse and keys, so the game never needs a camera:
+ * mouse aim, LMB fire, R reload, A/D lean, S duck, H holster, F focus.
+ */
+UCLASS(ClassGroup = (FingerGun), meta = (BlueprintSpawnableComponent))
+class FINGERGUNGAME_API UFGTrackerInput : public UActorComponent
+{
+    GENERATED_BODY()
+
+public:
+    UFGTrackerInput();
+
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+    /** Smoothed up to frame rate. */
+    FFGTrackerState State;
+
+    /** True while /fg/state packets are arriving. False = mouse mode. */
+    bool bTrackerLive = false;
+
+    /** Seconds with tracking == 0 while the tracker is live. */
+    float NoPersonSeconds = 0.0f;
+
+    FFGFireEvent OnFire;
+    FFGReloadEvent OnReload;
+
+    void SendCalibBegin();
+    void SendCalibTarget(float ScreenX, float ScreenY);
+    void SendRecenter();
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTexture2D> CameraTexture;
+
+    bool HasCameraPreview() const;
+
+    int32 StatePort = 7000;
+    int32 CommandPort = 7001;
+    int32 CameraPort = 7002;
+
+private:
+    FSocket* StateSocket = nullptr;
+    FSocket* CameraSocket = nullptr;
+    FSocket* SendSocket = nullptr;
+
+    FFGTrackerState Raw;
+    double LastStateTime = -1000.0;
+    double LastCameraTime = -1000.0;
+
+    uint16 CamFrameId = 0;
+    int32 CamPartsGot = 0;
+    TArray<TArray<uint8>> CamParts;
+
+    void PollState();
+    void PollCamera();
+    void HandleOsc(const uint8* Data, int32 Size);
+    void DecodeCameraFrame();
+    void SendOsc(const char* Address, const TArray<float>& Args);
+    void TickMouse(float DeltaTime);
+};

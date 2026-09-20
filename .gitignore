@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 tracker/.venv/
 tracker/recordings/
+unreal/*/Binaries/
+unreal/*/Intermediate/
+unreal/*/Saved/
+unreal/*/DerivedDataCache/
