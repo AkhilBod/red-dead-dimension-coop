@@ -41,6 +41,10 @@ class Config:
     # Played in the real game at 0.36 (and a 1.3x stretch on top, since removed): "so sensitive", "moves too much to a
     # slight reaction". [rec] 0.46 cuts the crosshair's shimmer at rest by a fifth and costs no lag.
     aim_span_m: float = 0.46            # metres of fingertip travel that cross the full screen width
+    # "finger": the crosshair sits where the fingertip is in the camera picture, like a pointer on a mirror. No learned
+    # centre, nothing to drift or recentre. "travel" is the model described above. The game's P key switches live.
+    aim_mode: str = "travel"
+    finger_gain: float = 1.7            # finger mode: the middle 1/gain of the camera picture covers the whole screen
     aim_edge_pull_rate: float = 0.4     # screens per second that a hand held past a screen edge pulls the centre along
     aim_settle_speed: float = 0.25      # m/s. Once the raised hand is slower than this...
     aim_settle_s: float = 0.2           # ...for this long, where it points is the middle of the screen

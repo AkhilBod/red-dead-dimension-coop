@@ -99,7 +99,13 @@ class AimMapper:
 
     def map(self, raw, dt=0.0):
         """dt > 0 lets a hand held past an edge pull the centre along. dt = 0 only reads."""
-        if self.center is None or raw is None:
+        if raw is None:
+            return 0.5, 0.5
+        if self.cfg.aim_mode == "finger":
+            # raw is the fingertip's place in the camera picture, 0..1 both ways
+            s = np.clip(0.5 + (np.asarray(raw) - 0.5) * self.cfg.finger_gain, 0.0, 1.0)
+            return float(s[0]), float(s[1])
+        if self.center is None:
             return 0.5, 0.5
         slope = self.k / self.span
         s = 0.5 + slope * (raw - self.center)

@@ -14,6 +14,7 @@ ADDR_RELOAD = "/fg/reload"
 ADDR_CALIB_BEGIN = "/fg/calib/begin"
 ADDR_CALIB_TARGET = "/fg/calib/target"
 ADDR_RECENTER = "/fg/recenter"
+ADDR_AIM_MODE = "/fg/aim_mode"        # [1.0] = pointer on the fingertip, [0.0] = travel from a learned centre
 
 
 @dataclass

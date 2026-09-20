@@ -86,6 +86,14 @@ class Pipeline:
         elif address == P.ADDR_RECENTER:
             self.body.recenter()
             self.recenter_aim = True
+        elif address == P.ADDR_AIM_MODE and len(args) >= 1:
+            self.cfg.aim_mode = "finger" if args[0] > 0.5 else "travel"
+            print(f"[tracker] aim mode: {self.cfg.aim_mode}")
+            # the two modes measure in different units: nothing remembered carries over
+            self.aim_filter.reset()
+            self.history.clear()
+            self.ref_tip = None
+            self.mapper.forget_center()
 
     def press_button(self, t_press):
         """The glove's trigger switch was pressed at time.monotonic() = t_press."""
@@ -271,7 +279,11 @@ class Pipeline:
             tip = gun.p2[INDEX_TIP]
             if self.ref_tip is None:
                 self.ref_tip, self.ref_chest = tip.copy(), aim_anchor.copy()
-            raw = self._lead(self.aim_filter((tip - self.ref_tip) / scale - (aim_anchor - self.ref_chest) / chest_scale, t))
+            if cfg.aim_mode == "finger":
+                travel = np.array([tip[0] / aspect, tip[1]])
+            else:
+                travel = (tip - self.ref_tip) / scale - (aim_anchor - self.ref_chest) / chest_scale
+            raw = self._lead(self.aim_filter(travel, t))
             self.history.push(t, raw)
 
             if self.gun_center is not None and t > self.gun_seen_t:

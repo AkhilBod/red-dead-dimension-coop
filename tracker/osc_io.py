@@ -40,7 +40,7 @@ class OscIn:
     def __init__(self, port):
         self.commands = queue.SimpleQueue()
         dispatcher = Dispatcher()
-        for addr in (P.ADDR_CALIB_BEGIN, P.ADDR_CALIB_TARGET, P.ADDR_RECENTER):
+        for addr in (P.ADDR_CALIB_BEGIN, P.ADDR_CALIB_TARGET, P.ADDR_RECENTER, P.ADDR_AIM_MODE):
             dispatcher.map(addr, self._on_message)
         self.server = None
         try:
