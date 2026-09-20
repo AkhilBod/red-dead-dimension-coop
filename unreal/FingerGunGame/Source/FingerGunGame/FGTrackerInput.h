@@ -64,6 +64,9 @@ public:
 
     bool HasCameraPreview() const;
 
+    /** Tracker aim is stretched about the screen centre by this much, so the edges need less reach. Mouse is untouched. */
+    float EdgeGain = 1.3f;
+
     int32 StatePort = 7000;
     int32 CommandPort = 7001;
     int32 CameraPort = 7002;
@@ -87,4 +90,5 @@ private:
     void DecodeCameraFrame();
     void SendOsc(const char* Address, const TArray<float>& Args);
     void TickMouse(float DeltaTime);
+    float Stretch(float V) const { return FMath::Clamp(0.5f + (V - 0.5f) * EdgeGain, 0.0f, 1.0f); }
 };

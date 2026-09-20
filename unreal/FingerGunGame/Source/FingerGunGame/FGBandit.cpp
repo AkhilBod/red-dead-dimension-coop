@@ -218,8 +218,12 @@ void AFGBandit::Tick(float DeltaTime)
 
     case EFGBanditState::Idle:
         Timer -= DeltaTime;
-        if (Timer <= 0.0f && Game->RequestAttackToken())
+        if (Timer <= 0.0f)
         {
+            // Never from behind or off screen: a shot the player could not see is not dodgeable.
+            FVector Chest, Head;
+            AimPoints(Chest, Head);
+            if (!Game->PlayerCanSee(Chest) || !Game->RequestAttackToken()) { break; }
             bHasToken = true;
             bShotThisTelegraph = false;
             if (bRider) { Play(Side > 0.0f ? TEXT("ride_aim_left") : TEXT("ride_aim_right")); }

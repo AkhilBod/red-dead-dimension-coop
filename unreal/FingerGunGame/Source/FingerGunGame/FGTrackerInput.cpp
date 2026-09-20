@@ -199,8 +199,8 @@ void UFGTrackerInput::HandleOsc(const uint8* Data, int32 Size)
 
     if (Address == TEXT("/fg/state") && Args.Num() >= 10)
     {
-        Raw.AimX = Args[0];
-        Raw.AimY = Args[1];
+        Raw.AimX = Stretch(Args[0]);
+        Raw.AimY = Stretch(Args[1]);
         Raw.bAimValid = Args[2] > 0.5f;
         Raw.bGunPose = Args[3] > 0.5f;
         Raw.bHolstered = Args[4] > 0.5f;
@@ -218,7 +218,7 @@ void UFGTrackerInput::HandleOsc(const uint8* Data, int32 Size)
     }
     else if (Address == TEXT("/fg/fire") && Args.Num() >= 2)
     {
-        OnFire.Broadcast(FVector2D(Args[0], Args[1]));
+        OnFire.Broadcast(FVector2D(Stretch(Args[0]), Stretch(Args[1])));
     }
     else if (Address == TEXT("/fg/reload"))
     {

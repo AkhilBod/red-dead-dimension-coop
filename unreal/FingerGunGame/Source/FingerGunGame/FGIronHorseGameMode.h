@@ -54,6 +54,8 @@ public:
 
     // ---- bandits ----
     bool RequestAttackToken();
+    /** On screen, inside a small margin. Bandits only shoot when the player could have seen it coming. */
+    bool PlayerCanSee(const FVector& WorldPoint) const;
     void ReleaseAttackToken();
     void OnTelegraph(AFGBandit* Bandit);
     void OnBanditKilled(AFGBandit* Bandit);

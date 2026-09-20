@@ -172,13 +172,14 @@ void AFGHud::DrawHUD()
         {
             const FVector2D C(Tracker->State.AimX * W, Tracker->State.AimY * H);
             const FLinearColor Col = GM->HitMarker > 0.0f ? Blood : Cream;
-            Ring(C, (22 + GM->HitMarker * 10) * U, 3 * U, Col);
-            Box(C.X - 3 * U, C.Y - 3 * U, 6 * U, 6 * U, Col);
+            Ring(C, (38 + GM->HitMarker * 14) * U, 5 * U, Col, 36);
+            Ring(C, (39 + GM->HitMarker * 14) * U + 3 * U, 2 * U, FLinearColor(0, 0, 0, 0.6f), 36);
+            Box(C.X - 5 * U, C.Y - 5 * U, 10 * U, 10 * U, Col);
         }
         else if (GM->HitMarker > 0.0f && !Tracker->bTrackerLive)
         {
             const FVector2D C(Tracker->State.AimX * W, Tracker->State.AimY * H);
-            Ring(C, (22 + GM->HitMarker * 10) * U, 3 * U, Blood);
+            Ring(C, (38 + GM->HitMarker * 14) * U, 5 * U, Blood, 36);
         }
     }
 

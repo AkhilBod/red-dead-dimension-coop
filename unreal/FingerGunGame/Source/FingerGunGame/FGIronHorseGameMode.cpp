@@ -40,7 +40,7 @@ namespace
     constexpr float SecondTrainUntil = 146.0f;
     constexpr float ShowdownAt = 150.0f;
     constexpr int32 MaxTokens = 2;
-    constexpr float AimAssistDegrees = 4.0f;        // how far off a shot may be and still hit
+    constexpr float AimAssistDegrees = 5.5f;        // how far off a shot may be and still hit
     constexpr float SideTrackCm = -700.0f;          // enemy line is 7 m to the driver's left
 
     const FVector2D CalibScreen[4] = { {0.22, 0.30}, {0.78, 0.30}, {0.78, 0.68}, {0.22, 0.68} };
@@ -114,7 +114,7 @@ void AFGIronHorseGameMode::TickTest(float DeltaTime)
         }
     }
     if (!bAutoPlay) { return; }
-    if (Phase == EFGPhase::Title && PhaseTime > 1.0f) { SetPhase(EFGPhase::Calibrate); }
+    if (Phase == EFGPhase::Title && PhaseTime > 1.0f) { SetPhase(EFGPhase::Tutorial); }
     AutoTimer -= DeltaTime;
     if (AutoTimer > 0.0f) { return; }
     AutoTimer = 0.7f;
@@ -326,11 +326,11 @@ void AFGIronHorseGameMode::SpawnCalibBottle()
 
 void AFGIronHorseGameMode::SpawnCans()
 {
-    // On the boxcar roof ahead. Three cans and two rounds left: the gun runs dry and the reload prompt teaches itself.
-    CansLeft = 3;
-    for (int32 i = 0; i < 3; ++i)
+    // Two cans on the boxcar roof ahead: enough to learn the trigger, then the bell.
+    CansLeft = 2;
+    for (int32 i = 0; i < 2; ++i)
     {
-        const FVector Base(PlayerForwardCm + 640.0f + i * 40.0f, (i - 1) * 130.0f, AFGTrain::RoofCm);
+        const FVector Base(PlayerForwardCm + 640.0f + i * 40.0f, (i * 2 - 1) * 90.0f, AFGTrain::RoofCm);
         AFGTarget* Crate = SpawnTarget(TEXT("props"), TEXT("SM_Crate"), FTransform(FRotator(0, i * 17.0f, 0), Base), 0.0f);
         Crate->bActive = false;
         const float Scale = 3.2f;
@@ -352,8 +352,12 @@ void AFGIronHorseGameMode::SpawnBell()
     USkeletalMeshComponent* Rig = World ? World->FindRig(TEXT("StationBell")) : nullptr;
     if (Rig)
     {
+        // As modelled the bell hangs 2.5 m up, far below a player on the roof. A taller post puts it near eye level.
+        const float Tall = 2.3f;
+        Rig->SetRelativeScale3D(FVector(Tall));
         Bell->SetActorLocation(Rig->GetComponentLocation());
-        Bell->CentreOffset = FVector(0, 0, 250.0f);
+        Bell->CentreOffset = FVector(0, 0, 250.0f * Tall);
+        Bell->Radius = 160.0f;
     }
     else
     {
@@ -421,7 +425,7 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
     switch (Phase)
     {
     case EFGPhase::Title:
-        if (PhaseTime > 2.5f && Player->Tracker->State.bAimValid && Player->Tracker->State.bGunPose) { SetPhase(EFGPhase::Calibrate); }
+        if (PhaseTime > 2.5f && Player->Tracker->State.bAimValid && Player->Tracker->State.bGunPose) { SetPhase(EFGPhase::Tutorial); }
         break;
     case EFGPhase::Calibrate:
     case EFGPhase::Tutorial:
@@ -504,7 +508,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
             FFGBanditSpec Spec;
             Spec.Kind = EFGBanditKind::Rider;
             const float Side = SpawnCount % 2 ? -1.0f : 1.0f;
-            Spec.Slot = FVector(FMath::FRandRange(1700.0f, 3200.0f), Side * FMath::FRandRange(1050.0f, 1450.0f), 0.0f);
+            Spec.Slot = FVector(FMath::FRandRange(2600.0f, 4200.0f), Side * FMath::FRandRange(700.0f, 1000.0f), 0.0f);
             Spec.Mesh = SpawnCount % 5 == 4 ? TEXT("SK_Gunslinger") : (SpawnCount % 3 == 2 ? TEXT("SK_Deputy") : TEXT("SK_Bandit"));
             Spec.HorseCoat = SpawnCount;
             Spec.FirstShotDelay = FMath::FRandRange(1.5f, 3.0f);
@@ -519,7 +523,7 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
             SpawnTimer = 3.0f;
             FFGBanditSpec Spec;
             Spec.Kind = EFGBanditKind::Boarder;
-            static const FVector Slots[] = { {1150, -75, 0}, {1500, 80, 0}, {1850, -60, 0}, {1300, 85, 0}, {1700, -80, 0} };
+            static const FVector Slots[] = { {1400, -45, 0}, {1650, 50, 0}, {1900, -35, 0}, {1500, 55, 0}, {1800, -50, 0} };
             Spec.Slot = Slots[SpawnCount % 5] + FVector(0, 0, AFGTrain::RoofCm);
             Spec.Mesh = SpawnCount % 4 == 3 ? TEXT("SK_Heavy") : (SpawnCount % 2 ? TEXT("SK_Bandit") : TEXT("SK_Deputy"));
             Spec.Health = Spec.Mesh == TEXT("SK_Heavy") ? 50.0f : 25.0f;
@@ -539,8 +543,8 @@ void AFGIronHorseGameMode::TickRide(float DeltaTime)
         }
         if (!BanditTrain->IsHidden())
         {
-            BanditTrain->Offset = FMath::FInterpTo(BanditTrain->Offset, 9.0, DeltaTime, 0.55f);
-            if (!bBanditTrainCrewed && BanditTrain->Offset > -40.0)
+            BanditTrain->Offset = FMath::FInterpTo(BanditTrain->Offset, 24.0, DeltaTime, 0.55f);
+            if (!bBanditTrainCrewed && BanditTrain->Offset > -10.0)
             {
                 bBanditTrainCrewed = true;
                 SpawnTimer = 0.0f;
@@ -759,6 +763,17 @@ bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVecto
         HitMarker = 1.0f;
     }
     return bHit;
+}
+
+bool AFGIronHorseGameMode::PlayerCanSee(const FVector& WorldPoint) const
+{
+    const APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+    int32 W = 0, H = 0;
+    FVector2D Screen;
+    if (!PC) { return false; }
+    PC->GetViewportSize(W, H);
+    if (W <= 0 || !PC->ProjectWorldLocationToScreen(WorldPoint, Screen)) { return false; }
+    return Screen.X > W * 0.04f && Screen.X < W * 0.96f && Screen.Y > H * 0.06f && Screen.Y < H * 0.94f;
 }
 
 bool AFGIronHorseGameMode::RequestAttackToken()
