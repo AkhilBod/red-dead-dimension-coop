@@ -40,7 +40,7 @@ namespace
     constexpr float SecondTrainUntil = 146.0f;
     constexpr float ShowdownAt = 150.0f;
     constexpr int32 MaxTokens = 2;
-    constexpr float AimAssistDegrees = 5.5f;        // how far off a shot may be and still hit
+    constexpr float AimAssistDegrees = 7.0f;        // how far off a shot may be and still hit
     constexpr float SideTrackCm = -700.0f;          // enemy line is 7 m to the driver's left
 
     const FVector2D CalibScreen[4] = { {0.22, 0.30}, {0.78, 0.30}, {0.78, 0.68}, {0.22, 0.68} };
@@ -451,6 +451,7 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
 
     TickTest(DeltaTime);
     if (SkipTo > 0.0f && Phase == EFGPhase::Ride) { RideTime = SkipTo; SkipTo = 0.0f; TrainSpeed = 26.0f; }
+    TickMagnet(DeltaTime);
     TickShots(DeltaTime);
     TickDuck();
     TickAtmosphere(DeltaTime);
@@ -763,6 +764,57 @@ bool AFGIronHorseGameMode::ResolvePlayerShot(const FVector& Origin, const FVecto
         HitMarker = 1.0f;
     }
     return bHit;
+}
+
+void AFGIronHorseGameMode::ShootablePoints(TArray<FVector>& Out) const
+{
+    const bool bBossLocked = Phase == EFGPhase::Showdown && ShowdownStep != 4;
+    for (const AFGBandit* B : Bandits)
+    {
+        if (!B || B->IsDead() || (B == Boss && bBossLocked)) { continue; }
+        FVector Chest, Head;
+        B->AimPoints(Chest, Head);
+        Out.Add(Chest);
+    }
+    for (const AFGTarget* T : Targets)
+    {
+        if (T && T->bActive) { Out.Add(T->Centre()); }
+    }
+}
+
+void AFGIronHorseGameMode::TickMagnet(float DeltaTime)
+{
+    // Aim magnetism: near a target the crosshair leans onto it, harder the closer it gets. It hides the last of the
+    // hand jitter exactly where it matters and makes a webcam feel like it is aiming for you, the way console shooters do.
+    const FFGTrackerState& In = Player->Tracker->State;
+    const FVector2D Raw(In.AimX, In.AimY);
+    FVector2D Want = FVector2D::ZeroVector;
+    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+    int32 W = 0, H = 0;
+    if (PC) { PC->GetViewportSize(W, H); }
+    if (PC && W > 0 && Player->Tracker->bTrackerLive && Phase != EFGPhase::Result && Phase != EFGPhase::Title)
+    {
+        constexpr float Reach = 0.13f;          // screen heights
+        const float Aspect = float(W) / float(H);
+        TArray<FVector> Points;
+        ShootablePoints(Points);
+        float BestD = Reach;
+        for (const FVector& P : Points)
+        {
+            FVector2D Px;
+            if (!PC->ProjectWorldLocationToScreen(P, Px)) { continue; }
+            const FVector2D N(Px.X / W, Px.Y / H);
+            const float D = FMath::Sqrt(FMath::Square((N.X - Raw.X) * Aspect) + FMath::Square(N.Y - Raw.Y));
+            if (D < BestD)
+            {
+                BestD = D;
+                Want = (N - Raw) * (0.75f * FMath::Pow(1.0f - D / Reach, 0.6f));
+            }
+        }
+    }
+    const float RealDelta = FApp::GetDeltaTime();
+    MagnetOffset = FMath::Vector2DInterpTo(MagnetOffset, Want, RealDelta, 12.0f);
+    AssistedAim = Raw + MagnetOffset;
 }
 
 bool AFGIronHorseGameMode::PlayerCanSee(const FVector& WorldPoint) const

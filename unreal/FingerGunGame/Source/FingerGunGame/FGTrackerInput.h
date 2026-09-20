@@ -65,7 +65,7 @@ public:
     bool HasCameraPreview() const;
 
     /** Tracker aim is stretched about the screen centre by this much, so the edges need less reach. Mouse is untouched. */
-    float EdgeGain = 1.3f;
+    float EdgeGain = 1.0f;      // 1.3 was tried and played far too twitchy: it multiplies jitter as well as reach
 
     int32 StatePort = 7000;
     int32 CommandPort = 7001;
@@ -79,6 +79,7 @@ private:
     FFGTrackerState Raw;
     double LastStateTime = -1000.0;
     double LastCameraTime = -1000.0;
+    double LastAimValidTime = -1000.0;
 
     uint16 CamFrameId = 0;
     int32 CamPartsGot = 0;

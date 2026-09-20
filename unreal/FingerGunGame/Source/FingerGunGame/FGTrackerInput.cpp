@@ -80,15 +80,21 @@ void UFGTrackerInput::TickComponent(float DeltaTime, ELevelTick TickType, FActor
     bTrackerLive = FPlatformTime::Seconds() - LastStateTime < 1.0;
     if (bTrackerLive)
     {
-        // 30 Hz in, frame rate out. Fast enough to add about one camera frame of lag, no more.
-        const float A = 1.0f - FMath::Exp(-RealDelta * 40.0f);
+        // 30 Hz in, frame rate out. How hard the crosshair chases depends on how far it has to go: a hand held
+        // still shimmers by about half a percent of the screen a frame, and following that is what reads as
+        // "too sensitive". Real moves are many times bigger and get the fast rate, so they are not delayed.
+        const float Gap = FMath::Sqrt(FMath::Square(Raw.AimX - State.AimX) + FMath::Square((Raw.AimY - State.AimY) * 0.5625f));
+        const float Rate = FMath::Lerp(5.0f, 42.0f, FMath::SmoothStep(0.004f, 0.035f, Gap));
+        const float A = 1.0f - FMath::Exp(-RealDelta * Rate);
         const float B = 1.0f - FMath::Exp(-RealDelta * 14.0f);
         State.AimX = FMath::Lerp(State.AimX, Raw.AimX, A);
         State.AimY = FMath::Lerp(State.AimY, Raw.AimY, A);
         State.Lean = FMath::Lerp(State.Lean, Raw.Lean, B);
         State.Duck = FMath::Lerp(State.Duck, Raw.Duck, B);
         State.BodySpeed = Raw.BodySpeed;
-        State.bAimValid = Raw.bAimValid;
+        // The hand model drops out for a few frames at a time. A crosshair that blinks feels broken: ride through it.
+        if (Raw.bAimValid) { LastAimValidTime = FPlatformTime::Seconds(); }
+        State.bAimValid = FPlatformTime::Seconds() - LastAimValidTime < 0.4;
         State.bGunPose = Raw.bGunPose;
         State.bHolstered = Raw.bHolstered;
         State.bTracking = Raw.bTracking;
@@ -199,8 +205,11 @@ void UFGTrackerInput::HandleOsc(const uint8* Data, int32 Size)
 
     if (Address == TEXT("/fg/state") && Args.Num() >= 10)
     {
-        Raw.AimX = Stretch(Args[0]);
-        Raw.AimY = Stretch(Args[1]);
+        if (Args[2] > 0.5f)
+        {
+            Raw.AimX = Stretch(Args[0]);
+            Raw.AimY = Stretch(Args[1]);
+        }
         Raw.bAimValid = Args[2] > 0.5f;
         Raw.bGunPose = Args[3] > 0.5f;
         Raw.bHolstered = Args[4] > 0.5f;

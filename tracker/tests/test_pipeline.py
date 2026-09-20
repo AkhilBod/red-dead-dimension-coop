@@ -218,7 +218,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual((state.aim_valid, state.gun_pose), (0.0, 0.0))
 
     def test_calibration_maps_pointing_positions_to_targets(self):
-        sim = Sim()
+        sim = Sim(Config(aim_span_m=0.36))      # the pointing offsets below were sized for this sensitivity
         base = rest_wrist()
         corners = [((0.15, 0.2), (-0.3, -0.18)), ((0.85, 0.2), (0.3, -0.18)), ((0.85, 0.8), (0.3, 0.18)), ((0.15, 0.8), (-0.3, 0.18))]
         sim.pipeline.handle_command(P.ADDR_CALIB_BEGIN, ())

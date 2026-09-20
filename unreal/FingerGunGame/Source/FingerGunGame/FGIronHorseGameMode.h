@@ -78,6 +78,8 @@ public:
     float DrawTimeMs = -1.0f;
     float ResultTime = 0.0f;
     float HitMarker = 0.0f;
+    /** Where the crosshair is drawn, 0..1: the tracker's aim, pulled toward the nearest thing worth shooting. */
+    FVector2D AssistedAim = FVector2D(0.5, 0.5);
     float RideTime = 0.0f;
     float TrainSpeed = 0.0f;                // m/s
     FString Rank() const;
@@ -162,6 +164,9 @@ private:
     void TickShots(float DeltaTime);
     void TickDuck();
     void TickAtmosphere(float DeltaTime);
+    void TickMagnet(float DeltaTime);
+    void ShootablePoints(TArray<FVector>& Out) const;
+    FVector2D MagnetOffset = FVector2D::ZeroVector;
     void HurtPlayer(const TCHAR* Sfx);
     AFGBandit* SpawnBandit(const FFGBanditSpec& Spec);
     AFGTarget* SpawnTarget(const FString& Folder, const FString& Mesh, const FTransform& At, float Radius);

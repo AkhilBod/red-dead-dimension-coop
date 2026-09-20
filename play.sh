@@ -7,4 +7,5 @@ HERE="${0:A:h}"
 PROJECT="${FG_PROJECT:-$HERE/unreal/FingerGunGame/FingerGunGame.uproject}"
 [[ -d "${PROJECT:h}/Binaries" ]] || PROJECT="$HOME/Downloads/FingerGunGame-main 5.8 - 2/FingerGunGame.uproject"
 "$UE" "$PROJECT" /Game/Levels/IronHorse -game -windowed -ResX=1600 -ResY=900 > /dev/null 2>&1 &
-cd "$HERE/tracker" && exec .venv/bin/python run.py --no-window "$@"
+# Every session is recorded (landmarks only, no video, gitignored) so tracking problems can be replayed and tuned afterwards.
+cd "$HERE/tracker" && exec .venv/bin/python run.py --no-window --record "$@"

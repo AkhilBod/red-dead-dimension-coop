@@ -170,7 +170,7 @@ void AFGHud::DrawHUD()
         const bool bShow = GM->bCrosshairVisible && Tracker->State.bAimValid && !GM->bPlayerDead;
         if (bShow)
         {
-            const FVector2D C(Tracker->State.AimX * W, Tracker->State.AimY * H);
+            const FVector2D C(GM->AssistedAim.X * W, GM->AssistedAim.Y * H);
             const FLinearColor Col = GM->HitMarker > 0.0f ? Blood : Cream;
             Ring(C, (38 + GM->HitMarker * 14) * U, 5 * U, Col, 36);
             Ring(C, (39 + GM->HitMarker * 14) * U + 3 * U, 2 * U, FLinearColor(0, 0, 0, 0.6f), 36);
