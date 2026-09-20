@@ -49,6 +49,8 @@ public:
     // ---- player ----
     bool PlayerMayFire() const;
     bool HandleUiShot(FVector2D Aim);
+    /** Back to the station with a clean slate, in place: no level reload to go wrong. */
+    void RideAgain();
     bool ResolvePlayerShot(const FVector& Origin, const FVector& Dir, const FVector& Muzzle);
     void OnPlayerDryFire();
     void OnPlayerReloaded();

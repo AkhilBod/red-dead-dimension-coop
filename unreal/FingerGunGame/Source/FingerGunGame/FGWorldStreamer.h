@@ -84,6 +84,8 @@ public:
     /** Nearest one still ahead: metres to it, and which side its arm is on. -1 if none. */
     float MetresToLeanObstacle(float& OutSide) const;
     void ClearQueue() { Pending.Reset(); }
+    /** Tear the whole line up and start again from nothing (ride again). */
+    void ResetLine();
     /** Anything with an event (duck, dark, trestle, narrow, side track) within this many metres ahead? */
     bool EventsWithin(float Metres) const;
 

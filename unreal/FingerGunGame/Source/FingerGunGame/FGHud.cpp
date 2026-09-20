@@ -126,7 +126,9 @@ void AFGHud::DrawHUD()
             const FBox2D B = AFGIronHorseGameMode::RideAgainButton();
             const float Pulse = 0.85f + 0.15f * FMath::Sin(Now * 4.0f);
             Box(B.Min.X * W, B.Min.Y * H, (B.Max.X - B.Min.X) * W, (B.Max.Y - B.Min.Y) * H, FLinearColor(Blood.R * Pulse, Blood.G, Blood.B, 1.0f));
-            Text(TEXT("SHOOT ANYWHERE TO RIDE AGAIN"), W * 0.5f, (B.Min.Y + B.Max.Y) * 0.5f * H, 28, Cream, true, false);
+            // Cream on the cream poster is invisible, so the label has to fit inside the red button: keep it short.
+            Text(TEXT("SHOOT TO RIDE AGAIN"), W * 0.5f, (B.Min.Y + B.Max.Y) * 0.5f * H, 24, Cream, true, false);
+            Text(TEXT("any shot, anywhere  (or slap, or Space)"), W * 0.5f, B.Max.Y * H + 26 * U, 16, Cream, true, true);
         }
     }
     else

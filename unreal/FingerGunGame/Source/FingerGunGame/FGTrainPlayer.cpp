@@ -259,6 +259,11 @@ void AFGTrainPlayer::HandleFire(FVector2D Aim, int32 Gun)
 void AFGTrainPlayer::HandleReload()
 {
     AFGIronHorseGameMode* GM = Game();
+    if (GM && GM->Phase == EFGPhase::Result)
+    {
+        if (GM->ResultTime > 1.5f) { GM->RideAgain(); }
+        return;
+    }
     if (!GM || (CurrentAmmo >= MagazineSize && (!IsDual() || AmmoL >= MagazineSize)))
     {
         return;

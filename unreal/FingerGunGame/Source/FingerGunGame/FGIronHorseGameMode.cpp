@@ -626,6 +626,11 @@ void AFGIronHorseGameMode::Tick(float DeltaTime)
         break;
     case EFGPhase::Result:
         ResultTime += DeltaTime;
+        if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+        {
+            const bool bKey = PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar);
+            if ((bKey && ResultTime > 1.0f) || ResultTime > 30.0f) { RideAgain(); }
+        }
         break;
     }
 
@@ -937,8 +942,52 @@ bool AFGIronHorseGameMode::HandleUiShot(FVector2D Aim)
     PlaySfx(TEXT("shot_player"));
     // Any shot restarts, not only one on the button: a dead player has no steady crosshair, and the booth must never
     // need a keyboard.
-    UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this)));
+    RideAgain();
     return true;
+}
+
+void AFGIronHorseGameMode::RideAgain()
+{
+    UE_LOG(LogTemp, Log, TEXT("IronHorse: ride again"));
+    for (AFGBandit* B : Bandits) { if (B) { B->Destroy(); } }
+    for (AFGTarget* T : Targets) { if (T) { T->Destroy(); } }
+    for (FFGEnemyShot& Shot : Shots) { if (Shot.Fx.IsValid()) { Shot.Fx->Destroy(); } }
+    Bandits.Reset();
+    Targets.Reset();
+    Shots.Reset();
+    Boss = nullptr;
+    TokensOut = 0;
+
+    Score = Kills = Headshots = Dodges = 0;
+    Lap = BossesBeaten = SpawnCount = CrewSpawned = 0;
+    DrawTimeMs = -1.0f;
+    DistanceM = 0.0;
+    RideTime = ResultTime = TrainSpeed = InvulnerableFor = QuietTime = BannerTime = 0.0f;
+    bPlayerDead = bBossBeaten = bInTunnel = bBanditTrainCrewed = bStayDown = bDuckWarning = false;
+    LeanWarning = 0.0f;
+    LastDuckDistance = LastLeanDistance = -1.0f;
+    ObstacleTimer = 12.0f;
+    ShowdownStep = 0;
+    Dusk = Night = NightTarget = 0.0f;
+    SunChainYaw = 150.0f;
+    SkyKey = -10.0f;
+
+    Player->Hats = 3;
+    Player->ShotsFired = Player->ShotsHit = 0;
+    Player->HitFlash = 0.0f;
+    Player->bGunHidden = false;
+    Player->ForcedDropCm = 0.0f;
+    Player->SetWeapon(0);
+
+    BanditTrain->SetActorHiddenInGame(true);
+    BanditTrain->Offset = -400.0;
+    World->ResetLine();
+    World->bAllowRandomLandmarks = false;
+    World->Queue({ TEXT("Flat_A"), TEXT("Landmark_Station_A"), TEXT("Flat_B"), TEXT("Rocky_A"), TEXT("Landmark_WaterTower_A"), TEXT("Cactus_A"), TEXT("CurveL_A"), TEXT("Mesa_A"), TEXT("CurveR_A") });
+    World->SetDistance(StartDistance);
+    Train->Place(World, 0.0f);
+
+    SetPhase(EFGPhase::Tutorial);       // straight to the cans: they have seen the title
 }
 
 void AFGIronHorseGameMode::OnPlayerDryFire() {}

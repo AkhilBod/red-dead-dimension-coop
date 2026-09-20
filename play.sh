@@ -6,6 +6,7 @@ HERE="${0:A:h}"
 # The copy in this repo needs building once (open the .uproject, say yes to rebuild). Until then, Akhil's working copy.
 PROJECT="${FG_PROJECT:-$HERE/unreal/FingerGunGame/FingerGunGame.uproject}"
 [[ -d "${PROJECT:h}/Binaries" ]] || PROJECT="$HOME/Downloads/FingerGunGame-main 5.8 - 2/FingerGunGame.uproject"
-"$UE" "$PROJECT" /Game/Levels/IronHorse -game -windowed -ResX=1600 -ResY=900 > /dev/null 2>&1 &
+# The game's log goes to Saved/play.log next to the project, so a problem in a session can be looked up afterwards.
+"$UE" "$PROJECT" /Game/Levels/IronHorse -game -windowed -ResX=1600 -ResY=900 -abslog="${PROJECT:h}/Saved/play.log" > /dev/null 2>&1 &
 # Every session is recorded (landmarks only, no video, gitignored) so tracking problems can be replayed and tuned afterwards.
 cd "$HERE/tracker" && exec .venv/bin/python run.py --no-window --record "$@"
