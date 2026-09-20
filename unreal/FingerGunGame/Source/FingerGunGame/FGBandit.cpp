@@ -36,6 +36,7 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
     MaxHealth = CurrentHealth = Spec.Health;
     AnimMesh = (Spec.Mesh == TEXT("SK_Heavy") || Spec.Mesh == TEXT("SK_Boss")) ? Spec.Mesh : TEXT("SK_Bandit");
     Body->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("characters"), Spec.Mesh));
+    Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
     Side = Spec.Slot.Y >= 0.0f ? 1.0f : -1.0f;
     Local = Spec.Slot;
     Timer = Spec.FirstShotDelay;
@@ -49,6 +50,7 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
     WarnLight->SetLightColor(FLinearColor(1.0f, 0.04f, 0.02f));
     WarnLight->SetAttenuationRadius(900.0f);
     WarnLight->SetCastShadows(false);
+    WarnLight->SetVisibility(false);
     WarnLight->RegisterComponent();
 
     switch (Spec.Kind)
@@ -60,6 +62,7 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
         Horse->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Horse->SetupAttachment(Root);
         Horse->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
+        Horse->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
         Horse->RegisterComponent();
         if (UAnimSequence* Gallop = FGAssets::Anim(TEXT("horses"), TEXT("SK_Horse_Bay"), TEXT("horse_gallop")))
         {
@@ -87,7 +90,9 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
         Local = Spec.Slot + FVector(0.0f, 0.0f, 900.0f);
         break;
     default:
-        Play(Spec.Mesh == TEXT("SK_Rifleman") ? TEXT("rifle_idle") : TEXT("idle"), true);
+        // Crews of the other train haul themselves up its far side. They used to pop into existence on the roof.
+        Play(TEXT("climb"), true);
+        Local = Spec.Slot + FVector(0.0f, -120.0f, -230.0f);
         break;
     }
     SetState(EFGBanditState::Entering);
@@ -188,6 +193,7 @@ void AFGBandit::Tick(float DeltaTime)
     const float Warn = Warning();
     const bool bBlinkOn = Warn > 0.0f && FMath::Fmod(Age * (5.0f + 9.0f * Warn), 1.0f) < 0.55f;
     WarnLight->SetIntensity(bBlinkOn ? 2500.0f : 0.0f);
+    WarnLight->SetVisibility(bBlinkOn);        // an unlit light still costs a light
 
     if (State == EFGBanditState::Dead)
     {
@@ -237,7 +243,13 @@ void AFGBandit::Tick(float DeltaTime)
         }
         else
         {
-            SetState(EFGBanditState::Idle);
+            const float A = FMath::Clamp(StateTime / 1.4f, 0.0f, 1.0f);
+            Local = FMath::Lerp(Spec.Slot + FVector(0.0f, -120.0f, -230.0f), Spec.Slot, FMath::SmoothStep(0.0f, 1.0f, A));
+            if (A >= 1.0f)
+            {
+                Play(Spec.Mesh == TEXT("SK_Rifleman") ? TEXT("rifle_idle") : TEXT("idle"), true);
+                SetState(EFGBanditState::Idle);
+            }
         }
         break;
 
@@ -278,7 +290,7 @@ void AFGBandit::Tick(float DeltaTime)
             if (bRider) { Play(TEXT("ride_gallop"), true); }
             else if (Spec.Kind == EFGBanditKind::Boarder) { Play(TEXT("cover_idle"), true); }
             else { Play(Spec.Mesh == TEXT("SK_Rifleman") || Spec.Mesh == TEXT("SK_Heavy") ? TEXT("rifle_idle") : TEXT("idle"), true); }
-            Timer = FMath::FRandRange(1.6f, 3.4f);
+            Timer = FMath::FRandRange(1.6f, 3.4f) * Game->FireDelayScale();
             SetState(EFGBanditState::Idle);
         }
         break;

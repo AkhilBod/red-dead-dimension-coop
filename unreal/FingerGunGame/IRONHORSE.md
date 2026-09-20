@@ -19,7 +19,9 @@ Art: `Scripts/import_art.py` imports `art/export/*.fbx` from the tracker repo in
 
 Keys while playing: **Space** recentres (stance and aim: use it when the player or the camera has moved), **P** switches the tracker between aim-from-a-learned-centre and crosshair-on-the-fingertip. `Scripts/fix_materials.py` makes every imported material two-sided (the scenery is open shells).
 
-Test switches on the command line: `-FGAuto` (plays itself), `-FGGod`, `-FGShots=4` (screenshot every 4 s to `Saved/Screenshots`), `-FGSkip=95` (jump to 95 s into the ride).
+Test switches on the command line: `-FGAuto` (plays itself), `-FGGod`, `-FGShots=4` (screenshot every 4 s to `Saved/Screenshots`), `-FGSkip=95` (jump to 95 s into the ride), `-FGPerf` (fps and worst frame to the log every 2 s).
+
+Performance: the game mode preloads and builds every asset at startup (the first launch on a machine takes about two minutes on a black screen while meshes build; afterwards under a second) and switches Lumen, ray tracing, virtual shadow maps and real-time sky capture off at runtime. M3 Air, 1600x900: 36 fps with multi-second freezes before, a locked 60 after.
 
 Build with the editor closed. If any Unreal window is open, the build writes `-0001` hot-reload copies and the game keeps loading the old module.
 

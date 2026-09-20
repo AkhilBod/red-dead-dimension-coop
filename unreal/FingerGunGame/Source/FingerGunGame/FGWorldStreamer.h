@@ -42,6 +42,7 @@ struct FFGPlacedChunk
     FTransform Start;                       // chain space
     TObjectPtr<UStaticMeshComponent> Mesh;
     TArray<TObjectPtr<USkeletalMeshComponent>> Rigs;
+    TArray<TObjectPtr<USceneComponent>> Dressing;
 };
 
 /**
@@ -78,6 +79,12 @@ public:
 
     bool bAllowRandomLandmarks = true;
 
+    /** Only straight chunks for now (the showdown: the sun has to stay put behind the boss). */
+    bool bStraightOnly = false;
+
+    /** How far the world has been turned round the train, degrees. Anything that belongs to the landscape, like the sun, turns with it. */
+    float WorldYaw() const;
+
 private:
     UPROPERTY()
     TObjectPtr<USceneComponent> ChainRoot;
@@ -98,6 +105,11 @@ private:
     const FFGChunkDef* FindDef(const FString& ShortName) const;
     const FFGChunkDef* PickNext();
     void Append(const FFGChunkDef* Def);
+    void BuildTown(FFGPlacedChunk& Placed);
+    bool bNextIsTown = false;
+
+    UPROPERTY()
+    TArray<TObjectPtr<USceneComponent>> LiveDressing;
     void DropFirst();
     FTransform ChainPose(double AtS) const;
 };

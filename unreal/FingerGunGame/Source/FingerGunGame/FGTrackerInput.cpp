@@ -89,6 +89,13 @@ void UFGTrackerInput::TickComponent(float DeltaTime, ELevelTick TickType, FActor
         const float B = 1.0f - FMath::Exp(-RealDelta * 14.0f);
         State.AimX = FMath::Lerp(State.AimX, Raw.AimX, A);
         State.AimY = FMath::Lerp(State.AimY, Raw.AimY, A);
+        const float Gap2 = FMath::Sqrt(FMath::Square(Raw.Aim2X - State.Aim2X) + FMath::Square((Raw.Aim2Y - State.Aim2Y) * 0.5625f));
+        const float A2 = 1.0f - FMath::Exp(-RealDelta * FMath::Lerp(5.0f, 42.0f, FMath::SmoothStep(0.004f, 0.035f, Gap2)));
+        State.Aim2X = FMath::Lerp(State.Aim2X, Raw.Aim2X, A2);
+        State.Aim2Y = FMath::Lerp(State.Aim2Y, Raw.Aim2Y, A2);
+        if (Raw.bAim2Valid) { LastAim2ValidTime = FPlatformTime::Seconds(); }
+        State.bAim2Valid = FPlatformTime::Seconds() - LastAim2ValidTime < 0.4;
+        State.bPrimaryOnRight = Raw.bPrimaryOnRight;
         State.Lean = FMath::Lerp(State.Lean, Raw.Lean, B);
         State.Duck = FMath::Lerp(State.Duck, Raw.Duck, B);
         State.BodySpeed = Raw.BodySpeed;
@@ -124,7 +131,7 @@ void UFGTrackerInput::TickMouse(float DeltaTime)
         PC->GetViewportSize(W, H);
         if (PC->GetMousePosition(MX, MY) && W > 0 && H > 0)
         {
-            OnFire.Broadcast(FVector2D(MX / W, MY / H));
+            OnFire.Broadcast(FVector2D(MX / W, MY / H), 0);
         }
     }
     if (PC->WasInputKeyJustPressed(EKeys::SpaceBar))
@@ -161,6 +168,10 @@ void UFGTrackerInput::TickMouse(float DeltaTime)
     State.bGunPose = true;
     State.bTracking = true;
     State.bOffHandOpen = PC->IsInputKeyDown(EKeys::F);
+    // Mouse dual wield: the second gun shows for a few seconds after a right click and shares the cursor.
+    State.bAim2Valid = FPlatformTime::Seconds() - LastAim2ValidTime < 4.0;
+    State.Aim2X = State.AimX;
+    State.Aim2Y = State.AimY;
 }
 
 void UFGTrackerInput::PollState()
@@ -234,9 +245,20 @@ void UFGTrackerInput::HandleOsc(const uint8* Data, int32 Size)
         }
         LastStateTime = FPlatformTime::Seconds();
     }
+    else if (Address == TEXT("/fg/state2") && Args.Num() >= 4)
+    {
+        Raw.bAim2Valid = Args[2] > 0.5f;
+        if (Raw.bAim2Valid)
+        {
+            Raw.Aim2X = Stretch(Args[0]);
+            Raw.Aim2Y = Stretch(Args[1]);
+            if (!State.bAim2Valid) { State.Aim2X = Raw.Aim2X; State.Aim2Y = Raw.Aim2Y; }
+        }
+        Raw.bPrimaryOnRight = Args[3] > 0.5f;
+    }
     else if (Address == TEXT("/fg/fire") && Args.Num() >= 2)
     {
-        OnFire.Broadcast(FVector2D(Stretch(Args[0]), Stretch(Args[1])));
+        OnFire.Broadcast(FVector2D(Stretch(Args[0]), Stretch(Args[1])), Args.Num() >= 3 && Args[2] > 0.5f ? 1 : 0);
     }
     else if (Address == TEXT("/fg/reload"))
     {

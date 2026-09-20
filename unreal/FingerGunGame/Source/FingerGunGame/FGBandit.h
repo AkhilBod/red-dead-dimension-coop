@@ -45,6 +45,7 @@ public:
     void AimPoints(FVector& OutChest, FVector& OutHead) const;
 
     void Leave();
+    bool IsRider() const { return Spec.Kind == EFGBanditKind::Rider; }
 
     /** Boss only: go for the gun. Fires after ReactionSeconds unless dead. */
     void Draw(float ReactionSeconds);

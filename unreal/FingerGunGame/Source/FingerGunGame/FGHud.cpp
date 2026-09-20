@@ -105,22 +105,24 @@ void AFGHud::DrawHUD()
         if (In >= 1.0f)
         {
             const float CX = W * 0.5f;
-            Text(GM->bPlayerDead ? TEXT("SHOT DOWN") : (GM->bBossBeaten ? TEXT("WANTED: NOBODY") : TEXT("END OF THE LINE")), CX, PY + 70 * U, 40, Ink, true, false);
+            Text(TEXT("END OF THE LINE"), CX, PY + 70 * U, 40, Ink, true, false);
             Box(PX + 40 * U, PY + 115 * U, PW - 80 * U, 4 * U, Ink);
             Text(GM->Rank(), CX, PY + 185 * U, 58, Blood, true, false);
             Text(FString::Printf(TEXT("$%d REWARD"), GM->Score), CX, PY + 265 * U, 34, Ink, true, false);
-            float Y = PY + 340 * U;
+            float Y = PY + 325 * U;
             auto Row = [&](const FString& L, const FString& R)
             {
                 Text(L, PX + 70 * U, Y, 24, Ink, false, false);
                 Text(R, PX + PW - 230 * U, Y, 24, Ink, false, false);
-                Y += 46 * U;
+                Y += 42 * U;
             };
+            Row(TEXT("DISTANCE"), FString::Printf(TEXT("%.1f km"), GM->DistanceM / 1000.0));
+            Row(TEXT("BOSSES"), FString::FromInt(GM->BossesBeaten));
             Row(TEXT("BANDITS"), FString::FromInt(GM->Kills));
             Row(TEXT("HEADSHOTS"), FString::FromInt(GM->Headshots));
             Row(TEXT("ACCURACY"), FString::Printf(TEXT("%d%%"), int32(GM->Accuracy() * 100.0f)));
             Row(TEXT("DODGES"), FString::FromInt(GM->Dodges));
-            Row(TEXT("DRAW"), GM->DrawTimeMs >= 0.0f ? FString::Printf(TEXT("%d ms"), int32(GM->DrawTimeMs)) : TEXT("--"));
+            Row(TEXT("BEST DRAW"), GM->DrawTimeMs >= 0.0f ? FString::Printf(TEXT("%d ms"), int32(GM->DrawTimeMs)) : TEXT("--"));
             const FBox2D B = AFGIronHorseGameMode::RideAgainButton();
             const float Pulse = 0.85f + 0.15f * FMath::Sin(Now * 4.0f);
             Box(B.Min.X * W, B.Min.Y * H, (B.Max.X - B.Min.X) * W, (B.Max.Y - B.Min.Y) * H, FLinearColor(Blood.R * Pulse, Blood.G, Blood.B, 1.0f));
@@ -130,7 +132,11 @@ void AFGHud::DrawHUD()
     else
     {
         // ---- prompts
-        if (GM->bDuckWarning)
+        if (GM->bStayDown)
+        {
+            Text(TEXT("STAY DOWN!"), W * 0.5f, H * 0.20f, 80, Brass);
+        }
+        else if (GM->bDuckWarning)
         {
             const float Blink = FMath::Fmod(Now * 3.0f, 1.0f) < 0.6f ? 1.0f : 0.3f;
             Text(TEXT("DUCK!"), W * 0.5f, H * 0.30f, 110, FLinearColor(Brass.R, Brass.G, Brass.B, Blink));
@@ -147,7 +153,7 @@ void AFGHud::DrawHUD()
         }
         if (GM->Phase == EFGPhase::Title)
         {
-            Text(TEXT("IRON HORSE"), W * 0.5f, H * 0.22f, 120, Brass);
+            Text(TEXT("RED DEAD DIMENSION"), W * 0.5f, H * 0.22f, 96, Brass);
         }
 
         // ---- hats (health), cylinder (ammo), score
@@ -156,16 +162,30 @@ void AFGHud::DrawHUD()
             Hat(W - (3 - i) * 95 * U - 30 * U, H * 0.06f + 8 * U, 56 * U, i < Player->Hats ? Cream : FLinearColor(0, 0, 0, 0.45f));
         }
         Text(FString::Printf(TEXT("$%d"), GM->Score), 40 * U, H * 0.06f + 10 * U, 40, Brass, false);
-
-        const FVector2D Cyl(W - 120 * U, H * 0.955f - 110 * U);
-        Ring(Cyl, 78 * U, 5 * U, Cream, 36);
-        for (int32 i = 0; i < Player->MagazineSize; ++i)
+        if (GM->Phase == EFGPhase::Ride || GM->Phase == EFGPhase::Showdown)
         {
-            const float A = -PI / 2 + 2 * PI * i / Player->MagazineSize;
-            const FVector2D P = Cyl + FVector2D(FMath::Cos(A), FMath::Sin(A)) * 46 * U;
-            const bool bLoaded = i < Player->GetCurrentAmmo();
-            const float S = 30 * U;
-            Box(P.X - S / 2, P.Y - S / 2, S, S, bLoaded ? Brass : FLinearColor(0, 0, 0, 0.55f));
+            Text(FString::Printf(TEXT("%.1f km    %d mph    lap %d"), GM->DistanceM / 1000.0, int32(GM->TrainSpeed * 2.237f), GM->Lap + 1), 40 * U, H * 0.06f + 62 * U, 18, Cream, false);
+        }
+        if (GM->BannerTime > 0.0f)
+        {
+            Text(GM->Banner, W * 0.5f, H * 0.33f, 72, FLinearColor(Brass.R, Brass.G, Brass.B, FMath::Min(1.0f, GM->BannerTime)));
+        }
+
+        auto Cylinder = [&](FVector2D Cyl, int32 Rounds)
+        {
+            Ring(Cyl, 78 * U, 5 * U, Cream, 36);
+            for (int32 i = 0; i < Player->MagazineSize; ++i)
+            {
+                const float A = -PI / 2 + 2 * PI * i / Player->MagazineSize;
+                const FVector2D P = Cyl + FVector2D(FMath::Cos(A), FMath::Sin(A)) * 46 * U;
+                const float S = 30 * U;
+                Box(P.X - S / 2, P.Y - S / 2, S, S, i < Rounds ? Brass : FLinearColor(0, 0, 0, 0.55f));
+            }
+        };
+        Cylinder(FVector2D(W - 120 * U, H * 0.955f - 110 * U), Player->GetCurrentAmmo());
+        if (Player->IsDual())
+        {
+            Cylinder(FVector2D(W - 300 * U, H * 0.955f - 110 * U), Player->AmmoL);
         }
 
         // ---- incoming shot: a red marker on the barrel that is about to fire, closing in as the 0.7 s run out
@@ -192,6 +212,14 @@ void AFGHud::DrawHUD()
             Ring(C, (38 + GM->HitMarker * 14) * U, 5 * U, Col, 36);
             Ring(C, (39 + GM->HitMarker * 14) * U + 3 * U, 2 * U, FLinearColor(0, 0, 0, 0.6f), 36);
             Box(C.X - 5 * U, C.Y - 5 * U, 10 * U, 10 * U, Col);
+        }
+        if (bShow && Player->IsDual() && Tracker->bTrackerLive)
+        {
+            // second gun: same ring in brass, so the two can be told apart
+            const FVector2D C2(GM->AssistedAim2.X * W, GM->AssistedAim2.Y * H);
+            Ring(C2, 38 * U, 5 * U, Brass, 36);
+            Ring(C2, 42 * U, 2 * U, FLinearColor(0, 0, 0, 0.6f), 36);
+            Box(C2.X - 5 * U, C2.Y - 5 * U, 10 * U, 10 * U, Brass);
         }
         else if (GM->HitMarker > 0.0f && !Tracker->bTrackerLive)
         {

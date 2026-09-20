@@ -34,15 +34,27 @@ public:
     UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
     TObjectPtr<USkeletalMeshComponent> Revolver;
 
+    /** Second revolver, mirrored, in view while a second gun hand is up. */
+    UPROPERTY(VisibleAnywhere, Category = "Finger Gun|Components")
+    TObjectPtr<USkeletalMeshComponent> RevolverL;
+
+    int32 AmmoL = 6;
+    float DualBlend = 0.0f;         // 0 = one gun, 1 = second gun fully up
+    bool IsDual() const { return DualBlend > 0.5f; }
+    bool IsEmpty() const;
+
     /** How far the eye drops at a full duck, cm. Roof walkway to eye is 160 standing; the roof's own clutter reaches ~50. */
     float DuckDropCm = 55.0f;
+    /** Set by the game mode under a low roof: the view is held at least this far down, ducking or not, so it cannot go through the ceiling. */
+    float ForcedDropCm = 0.0f;
+    float ForcedDropNow = 0.0f;
 
     FVector HeadLocation() const;
 
     /** Lose a hat. Returns true if that was the last one. */
     bool TakeHit();
 
-    void PlayGun(const FString& Action, bool bLoop = false);
+    void PlayGun(const FString& Action, bool bLoop = false, int32 Gun = 0);
 
     int32 Hats = 3;
     int32 ShotsFired = 0;
@@ -52,11 +64,16 @@ public:
     bool bGunHidden = false;
 
 private:
-    void HandleFire(FVector2D Aim);
+    void HandleFire(FVector2D Aim, int32 Gun);
+    /** The viewmodel that stands for a gun. The first gun's hand may be the left one. */
+    USkeletalMeshComponent* ModelFor(int32 Gun) const;
+    void PoseGun(USkeletalMeshComponent* Model, bool bLeft, FVector2D Aim, float Down, float Kick);
     void HandleReload();
 
     AFGIronHorseGameMode* Game() const;
     FRotator CameraBaseRotation = FRotator::ZeroRotator;
     float Recoil = 0.0f;
+    float RecoilL = 0.0f;
+    float LastFireL = -1000.0f;
     float HolsterBlend = 0.0f;
 };

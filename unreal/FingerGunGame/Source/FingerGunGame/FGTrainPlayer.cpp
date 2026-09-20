@@ -32,6 +32,12 @@ AFGTrainPlayer::AFGTrainPlayer()
     Revolver->SetCastShadow(false);
     Revolver->bOnlyOwnerSee = false;
 
+    RevolverL = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("RevolverL"));
+    RevolverL->SetupAttachment(FirstPersonCamera);
+    RevolverL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RevolverL->SetCastShadow(false);
+    RevolverL->SetRelativeScale3D(FVector(-1.0f, 1.0f, 1.0f));      // mirrored: the materials are two-sided
+
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     FirstPersonCamera->SetFieldOfView(80.0f);
 
@@ -51,7 +57,10 @@ void AFGTrainPlayer::BeginPlay()
     Super::BeginPlay();
     CrouchedCapsuleHalfHeight = StandingCapsuleHalfHeight;
     Revolver->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("fx"), TEXT("SK_PlayerRevolver")));
+    RevolverL->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("fx"), TEXT("SK_PlayerRevolver")));
     PlayGun(TEXT("fp_idle"), true);
+    PlayGun(TEXT("fp_idle"), true, 1);
+    AmmoL = MagazineSize;
     Tracker->OnFire.AddUObject(this, &AFGTrainPlayer::HandleFire);
     Tracker->OnReload.AddUObject(this, &AFGTrainPlayer::HandleReload);
     CameraBaseRotation = FirstPersonCamera->GetRelativeRotation();
@@ -77,12 +86,35 @@ FVector AFGTrainPlayer::HeadLocation() const
     return FirstPersonCamera->GetComponentLocation();
 }
 
-void AFGTrainPlayer::PlayGun(const FString& Action, bool bLoop)
+USkeletalMeshComponent* AFGTrainPlayer::ModelFor(int32 Gun) const
+{
+    // One gun: always the right-hand model. Two: each hand gets the model on its own side of the picture.
+    const bool bOnRight = !IsDual() || ((Gun == 0) == Tracker->State.bPrimaryOnRight);
+    return bOnRight ? Revolver : RevolverL;
+}
+
+bool AFGTrainPlayer::IsEmpty() const
+{
+    return CurrentAmmo <= 0 && (!IsDual() || AmmoL <= 0);
+}
+
+void AFGTrainPlayer::PlayGun(const FString& Action, bool bLoop, int32 Gun)
 {
     if (UAnimSequence* Seq = FGAssets::Anim(TEXT("fx"), TEXT("SK_PlayerRevolver"), Action))
     {
-        Revolver->PlayAnimation(Seq, bLoop);
+        ModelFor(Gun)->PlayAnimation(Seq, bLoop);
     }
+}
+
+void AFGTrainPlayer::PoseGun(USkeletalMeshComponent* Model, bool bLeft, FVector2D Aim, float Down, float Kick)
+{
+    // The gun follows its crosshair about half way, so it looks pointed without covering the target.
+    const float HalfFov = FirstPersonCamera->FieldOfView * 0.5f;
+    const float Yaw = (Aim.X - 0.5f) * 2.0f * HalfFov * 0.55f;
+    const float Pitch = (0.5f - Aim.Y) * 2.0f * HalfFov * 0.5625f * 0.55f;
+    const float Side = bLeft ? -1.0f : 1.0f;
+    Model->SetRelativeLocation(FVector(38.0f - Kick * 6.0f, Side * 15.0f + (Aim.X - 0.5f) * 14.0f, -17.0f - Down * 45.0f));
+    Model->SetRelativeRotation(FRotator(Pitch + Kick * 14.0f - Down * 50.0f, Yaw - 90.0f, 0.0f));
 }
 
 void AFGTrainPlayer::Tick(float DeltaTime)
@@ -91,7 +123,8 @@ void AFGTrainPlayer::Tick(float DeltaTime)
     SetBodyInput(In.Lean, 1.0f - In.Duck);
     SetAimNormalized(In.AimX * 2.0f - 1.0f, 1.0f - In.AimY * 2.0f);
     Super::Tick(DeltaTime);
-    CameraArm->SocketOffset = FVector(0.0f, 0.0f, -DuckDropCm * In.Duck);
+    ForcedDropNow = FMath::FInterpTo(ForcedDropNow, ForcedDropCm, DeltaTime, 9.0f);
+    CameraArm->SocketOffset = FVector(0.0f, 0.0f, -FMath::Max(DuckDropCm * In.Duck, ForcedDropNow));
 
     HitFlash = FMath::Max(0.0f, HitFlash - DeltaTime * 1.2f);
     Recoil = FMath::FInterpTo(Recoil, 0.0f, DeltaTime, 9.0f);
@@ -104,54 +137,74 @@ void AFGTrainPlayer::Tick(float DeltaTime)
         FMath::Sin(T * 1.7f) * 0.7f * Rumble + In.Lean * 2.5f);
     FirstPersonCamera->SetRelativeRotation(CameraBaseRotation + Sway);
 
-    // The gun follows the crosshair about half way, so it looks pointed without covering the target.
+    RecoilL = FMath::FInterpTo(RecoilL, 0.0f, DeltaTime, 9.0f);
     const bool bDown = In.bHolstered || !In.bAimValid || bGunHidden;
     HolsterBlend = FMath::FInterpTo(HolsterBlend, bDown ? 1.0f : 0.0f, DeltaTime, 10.0f);
-    const float HalfFov = FirstPersonCamera->FieldOfView * 0.5f;
-    const float Yaw = (In.AimX - 0.5f) * 2.0f * HalfFov * 0.55f;
-    const float Pitch = (0.5f - In.AimY) * 2.0f * HalfFov * 0.5625f * 0.55f;
-    Revolver->SetRelativeLocation(FVector(38.0f - Recoil * 6.0f, 15.0f + (In.AimX - 0.5f) * 14.0f, -17.0f - HolsterBlend * 45.0f));
-    Revolver->SetRelativeRotation(FRotator(Pitch + Recoil * 14.0f - HolsterBlend * 50.0f, Yaw - 90.0f, 0.0f));
+    DualBlend = FMath::FInterpTo(DualBlend, In.bAim2Valid && !bGunHidden ? 1.0f : 0.0f, DeltaTime, 8.0f);
+    const FVector2D Aim1(In.AimX, In.AimY), Aim2(In.Aim2X, In.Aim2Y);
+    const bool bSwap = IsDual() && !In.bPrimaryOnRight;
+    PoseGun(Revolver, false, bSwap ? Aim2 : Aim1, bSwap ? 1.0f - DualBlend : HolsterBlend, bSwap ? RecoilL : Recoil);
+    PoseGun(RevolverL, true, bSwap ? Aim1 : Aim2, bSwap ? HolsterBlend : 1.0f - DualBlend, bSwap ? Recoil : RecoilL);
+    RevolverL->SetVisibility(DualBlend > 0.02f);
 }
 
-void AFGTrainPlayer::HandleFire(FVector2D Aim)
+void AFGTrainPlayer::HandleFire(FVector2D Aim, int32 Gun)
 {
     AFGIronHorseGameMode* GM = Game();
-    if (!GM || !GM->PlayerMayFire())
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!GM || !PC || !GM->PlayerMayFire())
     {
         return;
     }
-    // The tracker rewinds the aim to where the hand pointed before the trigger motion. Shoot there.
-    SetAimNormalized(Aim.X * 2.0f - 1.0f, 1.0f - Aim.Y * 2.0f);
-    UpdateCrosshairPosition();
-
     if (GM->HandleUiShot(Aim))
     {
         return;         // result screen: shots only press buttons
     }
-    if (!bInfiniteAmmo && CurrentAmmo <= 0)
-    {
-        Fire();         // raises Lohith's OnDryFire
-        PlayGun(TEXT("fp_dry_fire"));
-        GM->PlaySfx(TEXT("dry"));
-        GM->OnPlayerDryFire();
-        return;
-    }
-    if (!CanFire())
-    {
-        return;
-    }
+    USkeletalMeshComponent* Model = ModelFor(Gun);
     FVector Origin, Dir;
-    if (!GetCrosshairWorldRay(Origin, Dir))
+    if (Gun == 0)
     {
-        return;
+        // The tracker rewinds the aim to where the hand pointed before the trigger motion. Shoot there.
+        SetAimNormalized(Aim.X * 2.0f - 1.0f, 1.0f - Aim.Y * 2.0f);
+        UpdateCrosshairPosition();
+        if (!bInfiniteAmmo && CurrentAmmo <= 0)
+        {
+            Fire();     // raises Lohith's OnDryFire
+            PlayGun(TEXT("fp_dry_fire"), false, 0);
+            GM->PlaySfx(TEXT("dry"));
+            return;
+        }
+        if (!CanFire() || !GetCrosshairWorldRay(Origin, Dir))
+        {
+            return;
+        }
+        Fire();         // Lohith: ammo, cooldown, world hitscan and damage
+        Recoil = 1.0f;
     }
-    Fire();             // Lohith: ammo, cooldown, world hitscan and damage
+    else
+    {
+        // The second gun keeps its own six rounds and cooldown beside the base class's.
+        int32 W = 0, H = 0;
+        PC->GetViewportSize(W, H);
+        const float Now = GetWorld()->GetTimeSeconds();
+        if (AmmoL <= 0)
+        {
+            PlayGun(TEXT("fp_dry_fire"), false, 1);
+            GM->PlaySfx(TEXT("dry"));
+            return;
+        }
+        if (Now - LastFireL < FireCooldown || W <= 0 || !PC->DeprojectScreenPositionToWorld(Aim.X * W, Aim.Y * H, Origin, Dir))
+        {
+            return;
+        }
+        LastFireL = Now;
+        --AmmoL;
+        RecoilL = 1.0f;
+    }
     ++ShotsFired;
-    Recoil = 1.0f;
-    PlayGun(TEXT("fp_fire"));
-    const FVector Muzzle = Revolver->DoesSocketExist(TEXT("muzzle")) ? Revolver->GetSocketLocation(TEXT("muzzle")) : HeadLocation() + Dir * 60.0f;
-    if (GM->ResolvePlayerShot(Origin, Dir, Muzzle))
+    PlayGun(TEXT("fp_fire"), false, Gun);
+    const FVector Muzzle = Model->DoesSocketExist(TEXT("muzzle")) ? Model->GetSocketLocation(TEXT("muzzle")) : HeadLocation() + Dir * 60.0f;
+    if (GM->ResolvePlayerShot(Origin, Dir.GetSafeNormal(), Muzzle))
     {
         ++ShotsHit;
     }
@@ -160,12 +213,14 @@ void AFGTrainPlayer::HandleFire(FVector2D Aim)
 void AFGTrainPlayer::HandleReload()
 {
     AFGIronHorseGameMode* GM = Game();
-    if (!GM || CurrentAmmo >= MagazineSize)
+    if (!GM || (CurrentAmmo >= MagazineSize && (!IsDual() || AmmoL >= MagazineSize)))
     {
         return;
     }
     Reload();
-    PlayGun(TEXT("fp_reload"));
+    AmmoL = MagazineSize;
+    PlayGun(TEXT("fp_reload"), false, 0);
+    if (IsDual()) { PlayGun(TEXT("fp_reload"), false, 1); }
     GM->PlaySfx(TEXT("reload"));
     GM->OnPlayerReloaded();
 }

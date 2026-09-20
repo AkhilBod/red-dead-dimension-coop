@@ -22,6 +22,9 @@ public:
 
     void AddLight(FLinearColor Color, float Intensity, float Radius);
 
+    /** Swap the mesh onto the translucent unlit material and fade it out over its life, so it never blocks the view. */
+    AFGFx* Glow(FLinearColor Color, float Opacity);
+
     UPROPERTY()
     TObjectPtr<UStaticMeshComponent> Mesh;
 
@@ -35,4 +38,8 @@ public:
 private:
     float Age = 0.0f;
     FVector StartScale = FVector::OneVector;
+    float GlowOpacity = 0.0f;
+
+    UPROPERTY()
+    TObjectPtr<class UMaterialInstanceDynamic> GlowMaterial;
 };

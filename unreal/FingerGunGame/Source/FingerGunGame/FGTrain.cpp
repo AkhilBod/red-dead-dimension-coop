@@ -50,6 +50,7 @@ void AFGTrain::Build(const TArray<FString>& CarNames, int32 ReferenceIndex, bool
         Comp->SetupAttachment(GetRootComponent());
         Comp->RegisterComponent();
         Comp->bEnableUpdateRateOptimizations = true;
+        Comp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;      // the cars behind the player animate for nobody
         if (UAnimSequence* Roll = FGAssets::Anim(TEXT("train"), Car.Mesh, TEXT("roll")))
         {
             Comp->PlayAnimation(Roll, true);

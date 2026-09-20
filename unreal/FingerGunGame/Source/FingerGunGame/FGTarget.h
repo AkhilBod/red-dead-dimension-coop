@@ -31,6 +31,10 @@ public:
     float Fuse = -1.0f;
     TFunction<void(AFGTarget*)> OnFuse;
     TWeakObjectPtr<USceneComponent> Follow;
+    /** Rides on something that moves (a car of the bandit train): world position = Local in the anchor's frame. */
+    TFunction<FTransform()> Anchor;
+    FVector Local = FVector::ZeroVector;
+    bool bExplosive = false;
 
     FVector Centre() const { return GetActorLocation() + CentreOffset; }
     void Shot();

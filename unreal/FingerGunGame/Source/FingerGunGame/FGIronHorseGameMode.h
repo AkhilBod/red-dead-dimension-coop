@@ -14,9 +14,11 @@ class ADirectionalLight;
 class ASkyLight;
 class UAudioComponent;
 class UPointLightComponent;
+class AExponentialHeightFog;
 struct FFGBanditSpec;
 
 enum class EFGPhase : uint8 { Title, Calibrate, Tutorial, Bell, Ride, Showdown, Result };
+enum class EFGStage : uint8 { Riders, Boarders, SecondTrain };
 
 struct FFGEnemyShot
 {
@@ -63,7 +65,21 @@ public:
     void SpawnEnemyShot(const FVector& From, bool bFast);
     void SpawnDynamite(const FVector& From);
 
+    // ---- difficulty: climbs with every lap and every minute, and levels off ----
+    float TargetSpeed() const;          // m/s
+    int32 MaxAlive() const;
+    int32 TokenLimit() const;
+    float ShotFlight() const;           // seconds an enemy bullet takes to arrive. Always dodgeable.
+    float FireDelayScale() const;
+    float SpawnEvery() const;
+
     // ---- read by the HUD ----
+    int32 Lap = 0;                      // one lap = riders, boarders, the other train, a boss. Then again, harder.
+    int32 BossesBeaten = 0;
+    double DistanceM = 0.0;
+    bool bStayDown = false;             // in a tunnel
+    FString Banner;
+    float BannerTime = 0.0f;
     EFGPhase Phase = EFGPhase::Title;
     FString Prompt;
     FString SubPrompt;
@@ -80,6 +96,7 @@ public:
     float HitMarker = 0.0f;
     /** Where the crosshair is drawn, 0..1: the tracker's aim, pulled toward the nearest thing worth shooting. */
     FVector2D AssistedAim = FVector2D(0.5, 0.5);
+    FVector2D AssistedAim2 = FVector2D(0.5, 0.5);
     float RideTime = 0.0f;
     float TrainSpeed = 0.0f;                // m/s
     FString Rank() const;
@@ -100,6 +117,10 @@ public:
     TObjectPtr<AFGTrain> BanditTrain;
 
 private:
+    /** Every mesh, animation and sound of the game, loaded and built before play and never let go. See Preload(). */
+    UPROPERTY()
+    TArray<TObjectPtr<UObject>> Preloaded;
+
     UPROPERTY()
     TArray<TObjectPtr<AFGBandit>> Bandits;
 
@@ -114,6 +135,9 @@ private:
 
     UPROPERTY()
     TObjectPtr<ASkyLight> Sky;
+
+    UPROPERTY()
+    TObjectPtr<AExponentialHeightFog> Fog;
 
     UPROPERTY()
     TObjectPtr<UAudioComponent> TrainLoop;
@@ -135,8 +159,26 @@ private:
     int32 SpawnCount = 0;
     bool bQueuedTunnel = false;
     bool bInTunnel = false;
+    bool bSkyCaptured = false;
     bool bQueuedSideTrack = false;
     bool bBanditTrainCrewed = false;
+    // the endless run
+    EFGStage Stage = EFGStage::Riders;
+    float StageTime = 0.0f;
+    float TrainTime = 0.0f;             // seconds the other train has been alongside
+    int32 StageFlags = 0;
+    int32 CrewSpawned = 0;
+    int32 TestLap = 0;
+    int32 TestStage = -1;
+    // sky
+    bool bOwnSky = false;
+    float Dusk = 0.0f;                  // 0 golden hour .. 1 sun on the horizon, dead ahead
+    float Night = 0.0f;
+    float NightTarget = 0.0f;
+    float SkyKey = -10.0f;
+    float SunChainYaw = 150.0f;         // where the sun stands in the landscape, not relative to the train
+    float QuietTime = 0.0f;             // seconds with nobody to shoot at
+    TFunction<FTransform()> OnOwnCar(int32 CarIndex) const;
     // showdown
     int32 ShowdownStep = 0;
     float ShowdownTimer = 0.0f;
@@ -147,6 +189,11 @@ private:
     // test switches, see BeginPlay
     bool bAutoPlay = false;
     bool bGod = false;
+    bool bPerf = false;
+    float PerfSum = 0.0f;
+    float PerfWorst = 0.0f;
+    int32 PerfSlow = 0;
+    int32 PerfFrames = 0;
     float ShotEvery = 0.0f;
     float ShotTimer = 2.0f;
     float SkipTo = 0.0f;
@@ -155,12 +202,16 @@ private:
     void TickTest(float DeltaTime);
 
     void SetPhase(EFGPhase NewPhase);
+    void Preload();
     void BuildSky();
     void BuildTrains();
     void SpawnCalibBottle();
     void SpawnCans();
     void SpawnBell();
     void Depart();
+    void BeginLap(int32 NewLap);
+    void NextStage(EFGStage NewStage);
+    void SpawnBarrel(const FVector& Local, TFunction<FTransform()> Anchor);
     void TickRide(float DeltaTime);
     void TickShowdown(float DeltaTime);
     void TickShots(float DeltaTime);
@@ -169,6 +220,8 @@ private:
     void TickMagnet(float DeltaTime);
     void ShootablePoints(TArray<FVector>& Out) const;
     FVector2D MagnetOffset = FVector2D::ZeroVector;
+    FVector2D MagnetOffset2 = FVector2D::ZeroVector;
+    FVector2D Magnet(FVector2D Raw, FVector2D& Offset, const TArray<FVector>& Points, float RealDelta) const;
     void HurtPlayer(const TCHAR* Sfx);
     AFGBandit* SpawnBandit(const FFGBanditSpec& Spec);
     AFGTarget* SpawnTarget(const FString& Folder, const FString& Mesh, const FTransform& At, float Radius);

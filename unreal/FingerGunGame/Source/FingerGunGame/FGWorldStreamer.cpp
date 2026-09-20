@@ -14,8 +14,10 @@
 namespace
 {
     constexpr double ChunkMetres = 50.0;
-    constexpr double KeepBehind = 120.0;
-    constexpr double KeepAhead = 600.0;
+    // The train reaches 35 m back from the player; a chunk is dropped as soon as its far end is 70 m behind.
+    // Ahead, the haze hides anything past ~400 m, so 450 m of track is all that ever needs to exist.
+    constexpr double KeepBehind = 70.0;
+    constexpr double KeepAhead = 450.0;
 
     // chunks.json is in Blender axes: metres, +Y = driver's left. Unreal: cm, +Y = right, yaw flips.
     FTransform FromJson(double X, double Y, double Z, double YawDeg)
@@ -99,8 +101,11 @@ void AFGWorldStreamer::LoadDefs()
     UE_LOG(LogTemp, Log, TEXT("IronHorse: %d chunk definitions"), Defs.Num());
 }
 
-const FFGChunkDef* AFGWorldStreamer::FindDef(const FString& ShortName) const
+const FFGChunkDef* AFGWorldStreamer::FindDef(const FString& QueuedName) const
 {
+    // "Flat_A+town" = that chunk, dressed as a town.
+    FString ShortName = QueuedName;
+    ShortName.RemoveFromEnd(TEXT("+town"));
     const FString Full = ShortName.StartsWith(TEXT("FG_Chunk_")) ? ShortName : TEXT("FG_Chunk_") + ShortName;
     return Defs.FindByPredicate([&Full](const FFGChunkDef& D) { return D.Name == Full; });
 }
@@ -118,6 +123,7 @@ const FFGChunkDef* AFGWorldStreamer::PickNext()
         const FFGChunkDef* Def = FindDef(Pending[0]);
         if (Def && Def->StartJoint == Joint)
         {
+            bNextIsTown = Pending[0].EndsWith(TEXT("+town"));
             Pending.RemoveAt(0);
             return Def;
         }
@@ -138,6 +144,7 @@ const FFGChunkDef* AFGWorldStreamer::PickNext()
         if (Joint == TEXT("O") && D.EndJoint != TEXT("O")) { continue; }                 // set pieces only when the director asks
         if (D.Name.Contains(TEXT("Station"))) { continue; }
         if (!bAllowRandomLandmarks && D.Events.Num()) { continue; }
+        if (bStraightOnly && !(D.End.GetRotation().IsIdentity(1e-4f) && FMath::IsNearlyZero(D.End.GetLocation().Y, 1.0))) { continue; }
         if (Chain.Num() && Chain.Last().Def == &D) { continue; }
         Legal.Add(&D);
         Total += D.Weight;
@@ -174,11 +181,23 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
     UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(this);
     Mesh->SetMobility(EComponentMobility::Movable);
     Mesh->SetStaticMesh(FGAssets::StaticMesh(TEXT("chunks"), TEXT("SM_") + Def->Name));
-    Mesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    Mesh->SetCollisionResponseToAllChannels(ECR_Block);
-    Mesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);    // a gantry passing at 26 m/s must not shove the camera arm
+    Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Mesh->SetupAttachment(ChainRoot);
     Mesh->SetRelativeTransform(Placed.Start);
+    if (Def->Name.Contains(TEXT("Tunnel_")) && !Def->Name.Contains(TEXT("Curve")))
+    {
+        // A third wider, so a full lean stays inside the walls. Only the straight pieces: widening a curve would
+        // move its centreline off the one in chunks.json. The roof stays where it is: standing up in there is meant to hurt.
+        // And a third taller. As modelled the inner cross-beams hang at 5.2 m, under even a ducked eye, and the view
+        // went through every one of them. Dropped by the same factor's worth of rail height, so the rails still meet.
+        Mesh->SetRelativeScale3D(FVector(1.0f, 1.3f, 1.3f));
+        Mesh->AddRelativeLocation(FVector(0.0f, 0.0f, -53.0f * 0.3f));
+    }
+    if (bNextIsTown)
+    {
+        bNextIsTown = false;
+        BuildTown(Placed);
+    }
     Mesh->RegisterComponent();
     Placed.Mesh = Mesh;
     LiveMeshes.Add(Mesh);
@@ -191,6 +210,7 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
         USkeletalMeshComponent* Comp = NewObject<USkeletalMeshComponent>(this);
         Comp->SetMobility(EComponentMobility::Movable);
         Comp->SetSkeletalMesh(SkelMesh);
+        Comp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
         Comp->SetupAttachment(ChainRoot);
         Comp->SetRelativeTransform(Rig.Local * Placed.Start);
         Comp->RegisterComponent();
@@ -208,9 +228,58 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
     }
 }
 
+void AFGWorldStreamer::BuildTown(FFGPlacedChunk& Placed)
+{
+    // A street either side of the line, fronts to the track, 23 m out: clear of the riding lanes (6-18 m).
+    // Buildings are modelled with the origin on the front wall and the front towards +Y.
+    struct FLot { const TCHAR* Mesh; float HalfWidth; };
+    static const FLot Lots[] = { {TEXT("SM_GeneralStore"), 490}, {TEXT("SM_Sheriff"), 390}, {TEXT("SM_Bank"), 440}, {TEXT("SM_Hotel"), 540},
+                                 {TEXT("SM_Shack"), 290}, {TEXT("SM_Barn"), 540}, {TEXT("SM_Church"), 380}, {TEXT("SM_Outhouse"), 75} };
+    static const TCHAR* Clutter[] = { TEXT("SM_Wagon"), TEXT("SM_HayBale"), TEXT("SM_Trough"), TEXT("SM_HitchingPost"), TEXT("SM_Bench"), TEXT("SM_WantedBoard"), TEXT("SM_Barrel"), TEXT("SM_Crate"), TEXT("SM_Signpost") };
+    auto Place = [this, &Placed](const FString& Folder, const FString& Name, const FTransform& Local)
+    {
+        UStaticMesh* Asset = FGAssets::StaticMesh(Folder, Name);
+        if (!Asset) { return; }
+        UStaticMeshComponent* Comp = NewObject<UStaticMeshComponent>(this);
+        Comp->SetMobility(EComponentMobility::Movable);
+        Comp->SetStaticMesh(Asset);
+        Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Comp->SetupAttachment(ChainRoot);
+        Comp->SetRelativeTransform(Local * Placed.Start);
+        Comp->RegisterComponent();
+        Placed.Dressing.Add(Comp);
+        LiveDressing.Add(Comp);
+    };
+    for (const float Side : { -1.0f, 1.0f })
+    {
+        const FRotator Face(0.0f, Side > 0.0f ? 180.0f : 0.0f, 0.0f);
+        float X = 250.0f + Rng.FRandRange(0.0f, 300.0f);
+        while (true)
+        {
+            const FLot& Lot = Lots[Rng.RandRange(0, UE_ARRAY_COUNT(Lots) - 1)];
+            if (X + 2.0f * Lot.HalfWidth > 4800.0f) { break; }
+            X += Lot.HalfWidth;
+            Place(TEXT("buildings"), Lot.Mesh, FTransform(Face, FVector(X, Side * 2300.0f, 0.0f)));
+            Place(TEXT("props"), Clutter[Rng.RandRange(0, UE_ARRAY_COUNT(Clutter) - 1)], FTransform(FRotator(0, Rng.FRandRange(0.f, 360.f), 0), FVector(X + Rng.FRandRange(-250.f, 250.f), Side * 2080.0f, 0.0f)));
+            X += Lot.HalfWidth + Rng.FRandRange(120.0f, 380.0f);
+            Place(TEXT("props"), TEXT("SM_LampPost"), FTransform(FVector(X - 60.0f, Side * 1980.0f, 0.0f)));
+        }
+    }
+}
+
+float AFGWorldStreamer::WorldYaw() const
+{
+    return ChainRoot->GetComponentRotation().Yaw;
+}
+
 void AFGWorldStreamer::DropFirst()
 {
     FFGPlacedChunk& First = Chain[0];
+    for (USceneComponent* Piece : First.Dressing)
+    {
+        LiveDressing.Remove(Piece);
+        Piece->DestroyComponent();
+    }
     if (First.Mesh)
     {
         LiveMeshes.Remove(First.Mesh);

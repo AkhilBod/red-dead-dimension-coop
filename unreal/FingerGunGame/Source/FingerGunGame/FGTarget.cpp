@@ -15,6 +15,11 @@ AFGTarget::AFGTarget()
 void AFGTarget::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+    if (Anchor)
+    {
+        const FTransform T = FTransform(Local) * Anchor();
+        SetActorLocationAndRotation(T.GetLocation(), T.GetRotation());
+    }
     if (Follow.IsValid())
     {
         SetActorLocation(Follow->GetComponentLocation());

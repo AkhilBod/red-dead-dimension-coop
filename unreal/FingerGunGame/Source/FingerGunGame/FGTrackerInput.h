@@ -20,16 +20,22 @@ struct FFGTrackerState
     float BodySpeed = 0.0f;
     bool bTracking = false;
     bool bOffHandOpen = false;
+
+    // Second gun (dual wield), from /fg/state2.
+    float Aim2X = 0.5f;
+    float Aim2Y = 0.5f;
+    bool bAim2Valid = false;
+    bool bPrimaryOnRight = true;    // which side of the picture the first gun's hand is on
 };
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FFGFireEvent, FVector2D);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FFGFireEvent, FVector2D /*Aim*/, int32 /*Gun: 0 first, 1 second*/);
 DECLARE_MULTICAST_DELEGATE(FFGReloadEvent);
 
 /**
  * The seam to the Python tracker. OSC over UDP on 7000 (state, fire, reload), commands back on 7001,
  * and the tracker's camera preview as JPEG fragments on 7002.
  * With no tracker running it falls back to mouse and keys, so the game never needs a camera:
- * mouse aim, LMB fire, R reload, A/D lean, S duck, H holster, F focus.
+ * mouse aim, LMB fire (RMB fires the second gun), R reload, A/D lean, S duck, H holster, F focus.
  */
 UCLASS(ClassGroup = (FingerGun), meta = (BlueprintSpawnableComponent))
 class FINGERGUNGAME_API UFGTrackerInput : public UActorComponent
@@ -87,6 +93,7 @@ private:
     double LastStateTime = -1000.0;
     double LastCameraTime = -1000.0;
     double LastAimValidTime = -1000.0;
+    double LastAim2ValidTime = -1000.0;
 
     uint16 CamFrameId = 0;
     int32 CamPartsGot = 0;

@@ -4,6 +4,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "FGAssets.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 AFGFx::AFGFx()
 {
@@ -44,6 +46,21 @@ void AFGFx::AddLight(FLinearColor Color, float Intensity, float Radius)
     Light->RegisterComponent();
 }
 
+AFGFx* AFGFx::Glow(FLinearColor Color, float Opacity)
+{
+    static TWeakObjectPtr<UMaterialInterface> Base;
+    if (!Base.IsValid()) { Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/IronHorse/fx/M_FG_Glow.M_FG_Glow")); }
+    if (Base.IsValid())
+    {
+        GlowMaterial = UMaterialInstanceDynamic::Create(Base.Get(), this);
+        GlowMaterial->SetVectorParameterValue(TEXT("Color"), Color);
+        GlowMaterial->SetScalarParameterValue(TEXT("Opacity"), Opacity);
+        GlowOpacity = Opacity;
+        for (int32 i = 0; i < Mesh->GetNumMaterials(); ++i) { Mesh->SetMaterial(i, GlowMaterial); }
+    }
+    return this;
+}
+
 void AFGFx::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
@@ -62,6 +79,10 @@ void AFGFx::Tick(float DeltaTime)
         Spin = FRotator::ZeroRotator;
     }
     SetActorLocationAndRotation(Loc, GetActorRotation() + Spin * DeltaTime);
+    if (GlowMaterial)
+    {
+        GlowMaterial->SetScalarParameterValue(TEXT("Opacity"), GlowOpacity * FMath::Square(1.0f - Age / Life));
+    }
     if (Grow != 0.0f)
     {
         SetActorScale3D(StartScale * FMath::Max(0.01f, 1.0f + Grow * Age));
