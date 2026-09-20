@@ -39,9 +39,9 @@ Before you present:
 | Duck | Under water-tower spouts, signal gantries, tunnel roofs. Standing up in a tunnel costs a hat every 1.5 s |
 | Drop the hand to the hip | Holster, for the duel |
 
-One lap: a town, riders on horseback, a trestle bridge, boarders climbing onto the boxcar ahead, a slot canyon, a tunnel, a bandit train alongside with riflemen and dynamite, then a quick-draw duel with the boss at sunset. Beat him and night falls, you get a new gun (revolver, shotgun, rifle, long Colt), and it goes round again harder. Speed climbs 26 to 46 m/s, enemies alive 3 to 6, enemy bullets arrive in 0.7 down to 0.45 s. Headshots win a hat back. Oil barrels take everyone near them.
+One lap: a town, riders on horseback, a trestle bridge, boarders climbing onto the boxcar ahead, a slot canyon, a tunnel, a bandit train alongside with riflemen and dynamite, then a quick-draw duel with the boss at sunset. Beat him and night falls, you get a new gun (revolver, shotgun, rifle, long Colt), and it goes round again harder. Speed climbs 26 to 40 m/s, enemies alive 2 to 4, enemy bullets arrive in 0.75 down to 0.5 s. Signal arms over half the roof have to be leaned round. Headshots win a hat back. Oil barrels take everyone near them.
 
-Fairness rules that make it feel good: every enemy shot is telegraphed for 0.7 s with a red flash at the barrel and a closing ring on the HUD; at most two (later three) bandits may be shooting at once; nobody shoots from off screen; bullets are aimed at where your head **was**, so moving always works.
+Fairness rules that make it feel good: every enemy shot is telegraphed for 0.7 s with a red flash at the barrel and a closing ring on the HUD; one bandit may be shooting at once on the first lap, two after that; nobody shoots from off screen; bullets are aimed at where your head **was**, so moving always works.
 
 ## Architecture
 
@@ -91,7 +91,7 @@ Arduino: switch on pin 6, buzzer 7, LED 8. It talks serial to the tracker only. 
 
 ## What is original, what is not
 
-Original: all tracker signal processing, all game code, all 3D art and animation (procedural Blender scripts), all sound effects and the three music loops (synthesised in Python: Karplus-Strong plucked strings, shaped oscillators), the chunk system.
+Original: all tracker signal processing, all game code, all 3D art and animation (procedural Blender scripts), all sound effects (synthesised in Python; three music loops exist too but are off by default, `-FGMusic` turns them on), the chunk system.
 
 Not ours: MediaPipe hand and pose landmark models (Google), Unreal Engine 5.8, OpenCV, python-osc, NumPy/SciPy, Lohith's base player and bandit classes started from the UE first-person template. Much of the code was written with an AI coding assistant (Claude Code) directed by us; say so if asked, and check the track rules on it before claiming a track.
 
@@ -113,7 +113,7 @@ Not ours: MediaPipe hand and pose landmark models (Google), Unreal Engine 5.8, O
 ## Honest limits
 
 - The latest round of changes (guns per lap, music, night laps, taller tunnel, boss-fight fix, head-assisted lean) compiled but had not been playtested when this was written.
-- No Windows build yet: `Scripts/package_windows.bat` must be run on a Windows machine with UE 5.8.
+- A standalone Mac app is built (`./play.sh --app`). No Windows build yet: `Scripts/package_windows.bat` must be run on a Windows machine with UE 5.8.
 - Dim light and busy backgrounds hurt tracking. Bring a lamp.
 - Dual wielding and a one-handed pump reload were built, tried and switched off; they are options in the tracker config.
 
