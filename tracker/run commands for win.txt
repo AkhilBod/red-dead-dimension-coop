@@ -1,0 +1,5 @@
+run:
+powershell -ExecutionPolicy Bypass -File .\play.ps1
+
+mouse only run:
+powershell -ExecutionPolicy Bypass -File .\play.ps1 -MouseOnly
