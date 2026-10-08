@@ -86,6 +86,11 @@ public:
     int32 CameraPort = 7002;
 
 private:
+    bool bOpened = false;
+    bool bNoTracker = false;
+    bool IsLocal() const;
+    void OpenSockets();
+
     FSocket* StateSocket = nullptr;
     FSocket* CameraSocket = nullptr;
     FSocket* SendSocket = nullptr;

@@ -14,9 +14,8 @@
 namespace
 {
     constexpr double ChunkMetres = 50.0;
-    // The train reaches 35 m back from the player; a chunk is dropped as soon as its far end is 70 m behind.
     // Ahead, the haze hides anything past ~400 m, so 450 m of track is all that ever needs to exist.
-    constexpr double KeepBehind = 70.0;
+    // (Behind: KeepBehindM.)
     constexpr double KeepAhead = 450.0;
 
     // chunks.json is in Blender axes: metres, +Y = driver's left. Unreal: cm, +Y = right, yaw flips.
@@ -35,11 +34,20 @@ AFGWorldStreamer::AFGWorldStreamer()
     ChainRoot->SetMobility(EComponentMobility::Movable);
 }
 
-void AFGWorldStreamer::BeginPlay()
+void AFGWorldStreamer::PostInitializeComponents()
 {
-    Super::BeginPlay();
+    Super::PostInitializeComponents();
+    // Here and not in BeginPlay: the game mode lays the first chunks the moment this is spawned, and during the
+    // world's own BeginPlay a fresh actor's BeginPlay can come later than that.
     Rng.GenerateNewSeed();
     LoadDefs();
+}
+
+int32 AFGWorldStreamer::DefsChecksum() const
+{
+    uint32 Crc = 0;
+    for (const FFGChunkDef& D : Defs) { Crc = FCrc::StrCrc32(*D.Name, Crc); }
+    return int32(Crc);
 }
 
 void AFGWorldStreamer::LoadDefs()
@@ -123,7 +131,7 @@ const FFGChunkDef* AFGWorldStreamer::PickNext()
         const FFGChunkDef* Def = FindDef(Pending[0]);
         if (Def && Def->StartJoint == Joint)
         {
-            bNextIsTown = Pending[0].EndsWith(TEXT("+town"));
+            NextTownSeed = Pending[0].EndsWith(TEXT("+town")) ? Rng.RandRange(1, MAX_int32 - 1) : 0;
             Pending.RemoveAt(0);
             return Def;
         }
@@ -164,19 +172,39 @@ const FFGChunkDef* AFGWorldStreamer::PickNext()
 
 void AFGWorldStreamer::Append(const FFGChunkDef* Def)
 {
+    const FTransform Start = Chain.Num() ? Chain.Last().Def->End * Chain.Last().Start : FTransform::Identity;
+    const int32 Index = NextIndex;
+    const int32 TownSeed = NextTownSeed;
+    NextTownSeed = 0;
+    Lay(Def, Index, Start, TownSeed);
+    if (OnChunkAppended)
+    {
+        FFGChunkRec Rec;
+        Rec.Index = Index;
+        Rec.Def = int16(Def - Defs.GetData());
+        Rec.TownSeed = TownSeed;
+        Rec.Start = Start.GetLocation();
+        Rec.StartYaw = float(Start.Rotator().Yaw);
+        OnChunkAppended(Rec);
+    }
+}
+
+void AFGWorldStreamer::ApplyChunk(const FFGChunkRec& Rec)
+{
+    // Chunks are laid in order. Anything older than what is already down has been dropped behind us by now.
+    if (Rec.Index < NextIndex || !Defs.IsValidIndex(Rec.Def)) { return; }
+    Lay(&Defs[Rec.Def], Rec.Index, FTransform(FRotator(0.0, Rec.StartYaw, 0.0), Rec.Start), Rec.TownSeed);
+}
+
+void AFGWorldStreamer::Lay(const FFGChunkDef* Def, int32 Index, const FTransform& Start, int32 TownSeed)
+{
+    NextIndex = Index + 1;
+    UE_LOG(LogTemp, Log, TEXT("IronHorse: chunk %d %s%s"), Index, *Def->Name, TownSeed ? TEXT(" +town") : TEXT(""));
     FFGPlacedChunk& Placed = Chain.AddDefaulted_GetRef();
     Placed.Def = Def;
-    if (Chain.Num() > 1)
-    {
-        const FFGPlacedChunk& Prev = Chain[Chain.Num() - 2];
-        Placed.StartS = Prev.StartS + ChunkMetres;
-        Placed.Start = Prev.Def->End * Prev.Start;
-    }
-    else
-    {
-        Placed.StartS = 0.0;
-        Placed.Start = FTransform::Identity;
-    }
+    Placed.Index = Index;
+    Placed.StartS = Index * ChunkMetres;
+    Placed.Start = Start;
 
     UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(this);
     Mesh->SetMobility(EComponentMobility::Movable);
@@ -193,10 +221,9 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
         Mesh->SetRelativeScale3D(FVector(1.0f, 1.3f, 1.3f));
         Mesh->AddRelativeLocation(FVector(0.0f, 0.0f, -53.0f * 0.3f));
     }
-    if (bNextIsTown)
+    if (TownSeed != 0)
     {
-        bNextIsTown = false;
-        BuildTown(Placed);
+        BuildTown(Placed, TownSeed);
     }
     Mesh->RegisterComponent();
     Placed.Mesh = Mesh;
@@ -228,8 +255,10 @@ void AFGWorldStreamer::Append(const FFGChunkDef* Def)
     }
 }
 
-void AFGWorldStreamer::BuildTown(FFGPlacedChunk& Placed)
+void AFGWorldStreamer::BuildTown(FFGPlacedChunk& Placed, int32 Seed)
 {
+    // Its own dice, from a seed the host picked: both machines build the same street.
+    FRandomStream TownRng(Seed);
     // A street either side of the line, fronts to the track, 23 m out: clear of the riding lanes (6-18 m).
     // Buildings are modelled with the origin on the front wall and the front towards +Y.
     struct FLot { const TCHAR* Mesh; float HalfWidth; };
@@ -253,15 +282,15 @@ void AFGWorldStreamer::BuildTown(FFGPlacedChunk& Placed)
     for (const float Side : { -1.0f, 1.0f })
     {
         const FRotator Face(0.0f, Side > 0.0f ? 180.0f : 0.0f, 0.0f);
-        float X = 250.0f + Rng.FRandRange(0.0f, 300.0f);
+        float X = 250.0f + TownRng.FRandRange(0.0f, 300.0f);
         while (true)
         {
-            const FLot& Lot = Lots[Rng.RandRange(0, UE_ARRAY_COUNT(Lots) - 1)];
+            const FLot& Lot = Lots[TownRng.RandRange(0, UE_ARRAY_COUNT(Lots) - 1)];
             if (X + 2.0f * Lot.HalfWidth > 4800.0f) { break; }
             X += Lot.HalfWidth;
             Place(TEXT("buildings"), Lot.Mesh, FTransform(Face, FVector(X, Side * 2300.0f, 0.0f)));
-            Place(TEXT("props"), Clutter[Rng.RandRange(0, UE_ARRAY_COUNT(Clutter) - 1)], FTransform(FRotator(0, Rng.FRandRange(0.f, 360.f), 0), FVector(X + Rng.FRandRange(-250.f, 250.f), Side * 2080.0f, 0.0f)));
-            X += Lot.HalfWidth + Rng.FRandRange(120.0f, 380.0f);
+            Place(TEXT("props"), Clutter[TownRng.RandRange(0, UE_ARRAY_COUNT(Clutter) - 1)], FTransform(FRotator(0, TownRng.FRandRange(0.f, 360.f), 0), FVector(X + TownRng.FRandRange(-250.f, 250.f), Side * 2080.0f, 0.0f)));
+            X += Lot.HalfWidth + TownRng.FRandRange(120.0f, 380.0f);
             Place(TEXT("props"), TEXT("SM_LampPost"), FTransform(FVector(X - 60.0f, Side * 1980.0f, 0.0f)));
         }
     }
@@ -272,8 +301,26 @@ void AFGWorldStreamer::AddLeanObstacle(double Ahead, float Side)
     // Timber post at the trackside, arm reaching over one half of the car roof at head height, a lantern on the end.
     // Built from a crate mesh scaled into beams: no new art needed.
     FLeanObstacle& Ob = LeanObstacles.AddDefaulted_GetRef();
+    Ob.Id = NextLeanId++;
     Ob.S = S + Ahead;
     Ob.Side = Side;
+    BuildLeanObstacle(Ob);
+    if (OnLeanAdded) { OnLeanAdded(Ob.Id, Ob.S, Ob.Side); }
+}
+
+void AFGWorldStreamer::AddLeanObstacleAt(int32 Id, double AtS, float Side)
+{
+    if (AtS < S - KeepBehindM || LeanObstacles.ContainsByPredicate([Id](const FLeanObstacle& Ob) { return Ob.Id == Id; })) { return; }
+    FLeanObstacle& Ob = LeanObstacles.AddDefaulted_GetRef();
+    Ob.Id = Id;
+    Ob.S = AtS;
+    Ob.Side = Side;
+    BuildLeanObstacle(Ob);
+}
+
+void AFGWorldStreamer::BuildLeanObstacle(FLeanObstacle& Ob)
+{
+    const float Side = Ob.Side;
     const FTransform Frame = ChainPose(Ob.S);
     auto Piece = [this, &Ob, &Frame](const TCHAR* Mesh, const FVector& At, const FVector& Scale)
     {
@@ -305,6 +352,28 @@ float AFGWorldStreamer::MetresToLeanObstacle(float& OutSide) const
     return Best;
 }
 
+bool AFGWorldStreamer::LeanObstacleBetween(double FromS, double ToS, float& OutSide) const
+{
+    for (const FLeanObstacle& Ob : LeanObstacles)
+    {
+        if (Ob.S > FromS && Ob.S <= ToS) { OutSide = Ob.Side; return true; }
+    }
+    return false;
+}
+
+bool AFGWorldStreamer::EventBetween(FName Kind, double FromS, double ToS) const
+{
+    for (const FFGPlacedChunk& C : Chain)
+    {
+        for (const FFGChunkEvent& E : C.Def->Events)
+        {
+            const double At = C.StartS + E.S0;
+            if (E.Kind == Kind && At > FromS && At <= ToS) { return true; }
+        }
+    }
+    return false;
+}
+
 bool AFGWorldStreamer::EventsWithin(float Metres) const
 {
     for (const FFGPlacedChunk& C : Chain)
@@ -327,7 +396,9 @@ void AFGWorldStreamer::ResetLine()
     }
     LeanObstacles.Reset();
     Pending.Reset();
-    bNextIsTown = false;
+    NextTownSeed = 0;
+    NextIndex = 0;
+    NextLeanId = 0;
     bStraightOnly = false;
     S = 0.0;
 }
@@ -388,19 +459,19 @@ void AFGWorldStreamer::SetDistance(double NewS)
 {
     S = NewS;
     if (!Defs.Num()) { return; }
-    while (!Chain.Num() || Chain.Last().StartS + ChunkMetres < S + KeepAhead)
+    while (!bReplica && (!Chain.Num() || Chain.Last().StartS + ChunkMetres < S + KeepAhead))
     {
         const FFGChunkDef* Next = PickNext();
         if (!Next) { break; }
         Append(Next);
     }
-    while (Chain.Num() > 1 && Chain[0].StartS + ChunkMetres < S - KeepBehind)
+    while (Chain.Num() > 1 && Chain[0].StartS + ChunkMetres < S - KeepBehindM)
     {
         DropFirst();
     }
     for (int32 i = LeanObstacles.Num() - 1; i >= 0; --i)
     {
-        if (LeanObstacles[i].S < S - KeepBehind)
+        if (LeanObstacles[i].S < S - KeepBehindM)
         {
             for (USceneComponent* Part : LeanObstacles[i].Parts) { LiveDressing.Remove(Part); Part->DestroyComponent(); }
             LeanObstacles.RemoveAt(i);

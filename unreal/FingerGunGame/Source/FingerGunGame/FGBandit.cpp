@@ -4,11 +4,15 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "EngineUtils.h"
 #include "FGAssets.h"
 #include "FGFx.h"
+#include "FGGameState.h"
 #include "FGIronHorseGameMode.h"
+#include "FGPresentation.h"
 #include "FGTrain.h"
 #include "FGTrainPlayer.h"
+#include "Net/UnrealNetwork.h"
 
 namespace
 {
@@ -20,6 +24,10 @@ AFGBandit::AFGBandit()
 {
     PrimaryActorTick.bCanEverTick = true;
     bDestroyOnDeath = false;
+    bReplicates = true;
+    SetReplicateMovement(false);        // every machine places it from its anchor: see Place()
+    bAlwaysRelevant = true;
+    SetNetUpdateFrequency(30.0f);
     EnemyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
@@ -29,17 +37,71 @@ AFGBandit::AFGBandit()
     Body->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
 }
 
+void AFGBandit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(AFGBandit, Spec, COND_InitialOnly);
+    DOREPLIFETIME(AFGBandit, State);
+    DOREPLIFETIME(AFGBandit, Target);
+    DOREPLIFETIME(AFGBandit, Motion);
+    DOREPLIFETIME(AFGBandit, Anim);
+    DOREPLIFETIME(AFGBandit, bNetDead);
+    DOREPLIFETIME(AFGBandit, WarnFrom);
+    DOREPLIFETIME(AFGBandit, WarnUntil);
+}
+
 void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
 {
     Spec = InSpec;
     Game = InGame;
+    Spec.SpawnedAt = Now();
     MaxHealth = CurrentHealth = Spec.Health;
+    Timer = Spec.FirstShotDelay;
+    Build();
+    switch (Spec.Kind)
+    {
+    case EFGBanditKind::Rider:
+        Play(TEXT("ride_gallop"), true);
+        Local = FVector(-5500.0f, Spec.Slot.Y * 1.25f, 0.0f);
+        break;
+    case EFGBanditKind::Boarder:
+        Play(TEXT("climb"), true);
+        Local = Spec.Slot + FVector(0.0f, Side * 110.0f, -230.0f);
+        break;
+    case EFGBanditKind::Boss:
+        Play(TEXT("idle"), true);
+        Local = Spec.Slot + FVector(0.0f, 0.0f, 900.0f);
+        break;
+    default:
+        // Crews of the other train haul themselves up its far side. They used to pop into existence on the roof.
+        Play(TEXT("climb"), true);
+        Local = Spec.Slot + FVector(0.0f, -120.0f, -230.0f);
+        break;
+    }
+    Motion.Local = Local;
+    Motion.At = Now();
+    SetState(EFGBanditState::Entering);
+    Place(0.0f);
+}
+
+void AFGBandit::BeginPlay()
+{
+    Super::BeginPlay();
+    Presentation = AFGPresentation::Get(this);
+    if (Presentation.IsValid()) { AddTickPrerequisiteActor(Presentation.Get()); }
+    if (!HasAuthority() && !bBuilt && Spec.SpawnedAt > 0.0) { Build(); }
+}
+
+void AFGBandit::Build()
+{
+    if (bBuilt) { return; }
+    bBuilt = true;
+    if (!Presentation.IsValid()) { Presentation = AFGPresentation::Get(this); }
     AnimMesh = (Spec.Mesh == TEXT("SK_Heavy") || Spec.Mesh == TEXT("SK_Boss")) ? Spec.Mesh : TEXT("SK_Bandit");
     Body->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("characters"), Spec.Mesh));
-    Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+    // The host judges shots against the bones, also for a partner's view of a bandit the host is not looking at.
+    Body->VisibilityBasedAnimTickOption = GetNetMode() == NM_ListenServer ? EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
     Side = Spec.Slot.Y >= 0.0f ? 1.0f : -1.0f;
-    Local = Spec.Slot;
-    Timer = Spec.FirstShotDelay;
     SetActorScale3D(FVector(Spec.Scale));
 
     WarnLight = NewObject<UPointLightComponent>(this);
@@ -53,9 +115,7 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
     WarnLight->SetVisibility(false);
     WarnLight->RegisterComponent();
 
-    switch (Spec.Kind)
-    {
-    case EFGBanditKind::Rider:
+    if (Spec.Kind == EFGBanditKind::Rider)
     {
         Horse = NewObject<USkeletalMeshComponent>(this);
         Horse->SetSkeletalMesh(FGAssets::SkeletalMesh(TEXT("horses"), HorseCoats[Spec.HorseCoat % 4]));
@@ -68,11 +128,8 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
         {
             Horse->PlayAnimation(Gallop, true);
         }
-        Play(TEXT("ride_gallop"), true);
-        Local = FVector(-5500.0f, Spec.Slot.Y * 1.25f, 0.0f);
-        break;
     }
-    case EFGBanditKind::Boarder:
+    else if (Spec.Kind == EFGBanditKind::Boarder)
     {
         Cover = NewObject<UStaticMeshComponent>(this);
         Cover->SetStaticMesh(FGAssets::StaticMesh(TEXT("props"), TEXT("SM_Crate")));
@@ -81,25 +138,46 @@ void AFGBandit::Init(const FFGBanditSpec& InSpec, AFGIronHorseGameMode* InGame)
         Cover->SetUsingAbsoluteLocation(true);
         Cover->SetUsingAbsoluteRotation(true);
         Cover->RegisterComponent();
-        Play(TEXT("climb"), true);
-        Local = Spec.Slot + FVector(0.0f, Side * 110.0f, -230.0f);
-        break;
     }
-    case EFGBanditKind::Boss:
-        Play(TEXT("idle"), true);
-        Local = Spec.Slot + FVector(0.0f, 0.0f, 900.0f);
-        break;
-    default:
-        // Crews of the other train haul themselves up its far side. They used to pop into existence on the roof.
-        Play(TEXT("climb"), true);
-        Local = Spec.Slot + FVector(0.0f, -120.0f, -230.0f);
-        break;
+
+    if (!HasAuthority())
+    {
+        // A client catching up: wherever and whatever the host has it doing now.
+        Local = Motion.Local;
+        if (!Anim.Action.IsNone()) { PlayLocal(Anim.Action, Anim.bLoop, Anim.Rate); }
+        if (bNetDead) { DieCosmetic(); }
     }
-    SetState(EFGBanditState::Entering);
+}
+
+void AFGBandit::OnRep_Spec()
+{
+    Build();
+    Place(0.0f);
+}
+
+void AFGBandit::OnRep_Anim()
+{
+    if (bBuilt) { PlayLocal(Anim.Action, Anim.bLoop, Anim.Rate); }
+}
+
+void AFGBandit::OnRep_Dead()
+{
+    if (bBuilt && bNetDead) { DieCosmetic(); }
+}
+
+double AFGBandit::Now() const
+{
+    const AFGGameState* GS = GetWorld()->GetGameState<AFGGameState>();
+    return GS ? GS->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
 }
 
 float AFGBandit::Play(const FString& Action, bool bLoop, float Rate)
 {
+    // Host: here, and to everyone else through Anim.
+    Anim.Action = FName(*Action);
+    Anim.bLoop = bLoop;
+    Anim.Rate = Rate;
+    ++Anim.Seq;
     UAnimSequence* Seq = FGAssets::Anim(TEXT("characters"), AnimMesh, Action);
     if (!Seq)
     {
@@ -110,9 +188,18 @@ float AFGBandit::Play(const FString& Action, bool bLoop, float Rate)
     return Seq->GetPlayLength() / FMath::Max(0.01f, Rate);
 }
 
+void AFGBandit::PlayLocal(FName Action, bool bLoop, float Rate)
+{
+    if (UAnimSequence* Seq = FGAssets::Anim(TEXT("characters"), AnimMesh, Action.ToString()))
+    {
+        Body->PlayAnimation(Seq, bLoop);
+        Body->SetPlayRate(Rate);
+    }
+}
+
 FTransform AFGBandit::AnchorTransform() const
 {
-    return Spec.Anchor ? Spec.Anchor() : FTransform::Identity;
+    return Presentation.IsValid() ? Presentation->AnchorTransform(Spec.Anchor) : FTransform::Identity;
 }
 
 void AFGBandit::SetState(EFGBanditState NewState)
@@ -121,10 +208,21 @@ void AFGBandit::SetState(EFGBanditState NewState)
     StateTime = 0.0f;
 }
 
-void AFGBandit::FacePlayer()
+void AFGBandit::FacePlayers()
 {
-    if (!Game.IsValid() || !Game->Player) { return; }
-    const FVector To = Game->Player->HeadLocation() - GetActorLocation();
+    // Whoever it is shooting at, or the nearest player still standing.
+    const AFGTrainPlayer* Face = IsValid(Target) && !Target->bDowned ? Target.Get() : nullptr;
+    if (!Face)
+    {
+        float Best = TNumericLimits<float>::Max();
+        for (TActorIterator<AFGTrainPlayer> It(GetWorld()); It; ++It)
+        {
+            const float D = FVector::DistSquared(It->GetActorLocation(), GetActorLocation());
+            if (!It->bDowned && D < Best) { Best = D; Face = *It; }
+        }
+    }
+    if (!Face) { return; }
+    const FVector To = Face->HeadLocation() - GetActorLocation();
     SetActorRotation(FRotator(0.0, To.Rotation().Yaw, 0.0));
 }
 
@@ -149,24 +247,33 @@ void AFGBandit::AimPoints(FVector& OutChest, FVector& OutHead) const
 
 float AFGBandit::Warning() const
 {
-    if (bIsDead) { return 0.0f; }
-    if (State == EFGBanditState::Telegraph && !bShotThisTelegraph) { return FMath::Clamp(StateTime / TelegraphSeconds, 0.02f, 1.0f); }
-    if (State == EFGBanditState::Scripted && DrawTimer > 0.0f) { return FMath::Clamp(1.0f - DrawTimer, 0.02f, 1.0f); }
-    return 0.0f;
+    if (IsDown() || WarnUntil <= 0.0) { return 0.0f; }
+    const double T = Now();
+    if (T >= WarnUntil) { return 0.0f; }
+    return FMath::Clamp(float((T - WarnFrom) / FMath::Max(WarnUntil - WarnFrom, 0.01)), 0.02f, 1.0f);
 }
 
 void AFGBandit::Leave()
 {
     if (State != EFGBanditState::Dead)
     {
-        if (bHasToken && Game.IsValid()) { Game->ReleaseAttackToken(); bHasToken = false; }
+        ReleaseToken();
+        WarnUntil = 0.0;
         SetState(EFGBanditState::Leaving);
     }
+}
+
+void AFGBandit::ReleaseToken()
+{
+    if (TokenFrom.IsValid() && Game.IsValid()) { Game->ReleaseAttackToken(TokenFrom.Get()); }
+    TokenFrom = nullptr;
 }
 
 void AFGBandit::Draw(float ReactionSeconds)
 {
     DrawTimer = ReactionSeconds;
+    WarnFrom = Now() + ReactionSeconds - 1.0;
+    WarnUntil = Now() + ReactionSeconds;
     Play(TEXT("quickdraw"));
 }
 
@@ -175,25 +282,56 @@ void AFGBandit::FireAtPlayer(bool bFast)
     if (!Game.IsValid()) { return; }
     if (Spec.Kind == EFGBanditKind::Dynamiter)
     {
-        Game->SpawnDynamite(MuzzleLocation());
+        Game->SpawnDynamite(MuzzleLocation(), Target);
         return;
     }
-    Game->SpawnEnemyShot(MuzzleLocation(), bFast);
+    if (Spec.Kind == EFGBanditKind::Boss)
+    {
+        // The duel: one bullet for everyone still standing, a beat apart.
+        int32 i = 0;
+        for (AFGTrainPlayer* P : Game->AlivePlayers()) { Game->SpawnEnemyShot(MuzzleLocation(), bFast, P, 0.15f * i++); }
+        return;
+    }
+    Game->SpawnEnemyShot(MuzzleLocation(), bFast, Target, 0.0f);
 }
 
 void AFGBandit::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    if (!Game.IsValid()) { return; }
-    StateTime += DeltaTime;
-    Age += DeltaTime;
-    const bool bRider = Spec.Kind == EFGBanditKind::Rider;
+    if (!bBuilt) { return; }
 
     // Red flash at the barrel, quicker as the shot gets nearer.
     const float Warn = Warning();
-    const bool bBlinkOn = Warn > 0.0f && FMath::Fmod(Age * (5.0f + 9.0f * Warn), 1.0f) < 0.55f;
+    const bool bBlinkOn = Warn > 0.0f && FMath::Fmod(float(Now() - Spec.SpawnedAt) * (5.0f + 9.0f * Warn), 1.0f) < 0.55f;
     WarnLight->SetIntensity(bBlinkOn ? 2500.0f : 0.0f);
     WarnLight->SetVisibility(bBlinkOn);        // an unlit light still costs a light
+
+    if (HasAuthority())
+    {
+        if (!Game.IsValid()) { return; }
+        const FVector Before = Local;
+        TickHost(DeltaTime);
+        if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
+        if (!Local.Equals(Motion.Local, 0.5))
+        {
+            Motion.Velocity = DeltaTime > 0.0f ? FVector((Local - Before) / DeltaTime) : FVector::ZeroVector;
+            Motion.Local = Local;
+            Motion.At = Now();
+        }
+    }
+    else
+    {
+        // Carry it on from the last update at its last speed, and ease toward that rather than jump.
+        const FVector Predicted = FVector(Motion.Local) + FVector(Motion.Velocity) * FMath::Clamp(Now() - Motion.At, 0.0, 0.25);
+        Local = FVector::DistSquared(Local, Predicted) > FMath::Square(300.0f) ? Predicted : FMath::VInterpTo(Local, Predicted, DeltaTime, 12.0f);
+    }
+    Place(DeltaTime);
+}
+
+void AFGBandit::TickHost(float DeltaTime)
+{
+    StateTime += DeltaTime;
+    const bool bRider = Spec.Kind == EFGBanditKind::Rider;
 
     if (State == EFGBanditState::Dead)
     {
@@ -213,7 +351,6 @@ void AFGBandit::Tick(float DeltaTime)
         Local.Z = FMath::Max(Local.Z, bRider ? 0.0f : -20.0f);
         // (The horse is part of this actor, so it pulls up and is left behind with him. It used to gallop on
         // riderless, straight out over the next canyon.)
-        SetActorLocation((FTransform(Local) * AnchorTransform()).GetLocation());
         if (StateTime > 4.0f) { Destroy(); }
         return;
     }
@@ -254,17 +391,22 @@ void AFGBandit::Tick(float DeltaTime)
         Timer -= DeltaTime;
         if (Timer <= 0.0f)
         {
-            // Never from behind or off screen: a shot the player could not see is not dodgeable.
+            // Never from behind or off screen: a shot the player could not see is not dodgeable. With two on the
+            // roof it goes for whoever can see it and has the fewest guns on them already.
             FVector Chest, Head;
             AimPoints(Chest, Head);
-            if (!Game->PlayerCanSee(Chest) || !Game->RequestAttackToken()) { break; }
-            bHasToken = true;
+            AFGTrainPlayer* Victim = Game->PickTarget(Chest);
+            if (!Victim) { break; }
+            TokenFrom = Victim;
+            Target = Victim;
             bShotThisTelegraph = false;
             if (bRider) { Play(Side > 0.0f ? TEXT("ride_aim_left") : TEXT("ride_aim_right")); }
             else if (Spec.Kind == EFGBanditKind::Dynamiter) { Play(TEXT("throw")); }
             else if (Spec.Mesh == TEXT("SK_Rifleman")) { Play(TEXT("rifle_aim_start")); }
             else if (Spec.Mesh == TEXT("SK_Heavy")) { Play(TEXT("rifle_aim_start")); }
             else { Play(TEXT("aim_start")); }
+            WarnFrom = Now();
+            WarnUntil = WarnFrom + TelegraphSeconds;
             Game->OnTelegraph(this);
             SetState(EFGBanditState::Telegraph);
         }
@@ -274,6 +416,7 @@ void AFGBandit::Tick(float DeltaTime)
         if (StateTime >= TelegraphSeconds && !bShotThisTelegraph)
         {
             bShotThisTelegraph = true;
+            WarnUntil = 0.0;
             FireAtPlayer(false);
             if (bRider) { Play(Side > 0.0f ? TEXT("ride_shoot_left") : TEXT("ride_shoot_right")); }
             else if (Spec.Kind == EFGBanditKind::Dynamiter) { }
@@ -283,7 +426,7 @@ void AFGBandit::Tick(float DeltaTime)
         }
         if (StateTime >= TelegraphSeconds + 0.8f)
         {
-            if (bHasToken) { Game->ReleaseAttackToken(); bHasToken = false; }
+            ReleaseToken();
             if (bRider) { Play(TEXT("ride_gallop"), true); }
             else if (Spec.Kind == EFGBanditKind::Boarder) { Play(TEXT("cover_idle"), true); }
             else { Play(Spec.Mesh == TEXT("SK_Rifleman") || Spec.Mesh == TEXT("SK_Heavy") ? TEXT("rifle_idle") : TEXT("idle"), true); }
@@ -300,7 +443,7 @@ void AFGBandit::Tick(float DeltaTime)
             Local.X += DeadVelocity.X * DeltaTime;
             if (StateTime > 5.0f) { Destroy(); return; }
         }
-        else if (Spec.Kind == EFGBanditKind::Boarder || Spec.Kind == EFGBanditKind::Boss || !Spec.Anchor)
+        else if (Spec.Kind == EFGBanditKind::Boarder || Spec.Kind == EFGBanditKind::Boss || !Spec.Anchor.IsSet())
         {
             // Bails out over the side of our train.
             DeadVelocity.Y = Side * 380.0f;
@@ -322,6 +465,7 @@ void AFGBandit::Tick(float DeltaTime)
             DrawTimer -= DeltaTime;
             if (DrawTimer < 0.0f)
             {
+                WarnUntil = 0.0;
                 Play(TEXT("shoot"));
                 FireAtPlayer(true);
             }
@@ -331,10 +475,20 @@ void AFGBandit::Tick(float DeltaTime)
     default:
         break;
     }
+}
 
+void AFGBandit::Place(float DeltaTime)
+{
+    const bool bRider = Spec.Kind == EFGBanditKind::Rider;
+    if (IsDown() || State == EFGBanditState::Dead)
+    {
+        SetActorLocation((FTransform(Local) * AnchorTransform()).GetLocation());
+        return;
+    }
     FVector Shown = Local;
     if (bRider)
     {
+        const float Age = float(Now() - Spec.SpawnedAt);
         Shown.X += FMath::Sin(Age * 0.7f + Spec.Slot.X) * 160.0f;
         Shown.Y += FMath::Sin(Age * 0.45f + Spec.Slot.Y) * 90.0f;
     }
@@ -346,7 +500,7 @@ void AFGBandit::Tick(float DeltaTime)
     }
     else
     {
-        FacePlayer();
+        FacePlayers();
     }
     if (bRider && Horse)
     {
@@ -364,10 +518,21 @@ void AFGBandit::Die()
 {
     if (bIsDead) { return; }
     Super::Die();
-    if (bHasToken && Game.IsValid()) { Game->ReleaseAttackToken(); bHasToken = false; }
-    const bool bRider = Spec.Kind == EFGBanditKind::Rider;
-    Play(bRider ? TEXT("ride_death") : TEXT("death_back"));
-    if (bRider)
+    ReleaseToken();
+    bNetDead = true;
+    WarnUntil = 0.0;
+    Play(Spec.Kind == EFGBanditKind::Rider ? TEXT("ride_death") : TEXT("death_back"));
+    DieCosmetic();
+    DeadVelocity = FVector::ZeroVector;
+    SetState(EFGBanditState::Dead);
+    if (Game.IsValid()) { Game->OnBanditKilled(this); }
+}
+
+void AFGBandit::DieCosmetic()
+{
+    if (bCosmeticDeath) { return; }
+    bCosmeticDeath = true;
+    if (Spec.Kind == EFGBanditKind::Rider && Horse)
     {
         Horse->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
     }
@@ -381,7 +546,4 @@ void AFGBandit::Die()
     {
         Fx->Mesh->SetCastShadow(true);
     }
-    DeadVelocity = FVector::ZeroVector;
-    SetState(EFGBanditState::Dead);
-    if (Game.IsValid()) { Game->OnBanditKilled(this); }
 }

@@ -1,36 +1,107 @@
 #include "FGTarget.h"
 
 #include "Components/StaticMeshComponent.h"
-#include "FGFx.h"
+#include "Engine/StaticMesh.h"
+#include "FGGameState.h"
+#include "FGPresentation.h"
+#include "Net/UnrealNetwork.h"
 
 AFGTarget::AFGTarget()
 {
     PrimaryActorTick.bCanEverTick = true;
+    bReplicates = true;
+    SetReplicateMovement(false);        // placed on every machine, see Tick
+    bAlwaysRelevant = true;
+    SetNetUpdateFrequency(10.0f);
     Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
     Mesh->SetMobility(EComponentMobility::Movable);
     Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SetRootComponent(Mesh);
 }
 
+void AFGTarget::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AFGTarget, MeshAsset);
+    DOREPLIFETIME(AFGTarget, Scale);
+    DOREPLIFETIME(AFGTarget, Radius);
+    DOREPLIFETIME(AFGTarget, bActive);
+    DOREPLIFETIME(AFGTarget, CentreOffset);
+    DOREPLIFETIME(AFGTarget, Velocity);
+    DOREPLIFETIME(AFGTarget, Gravity);
+    DOREPLIFETIME(AFGTarget, ThrownAt);
+    DOREPLIFETIME(AFGTarget, Anchor);
+    DOREPLIFETIME(AFGTarget, Local);
+    DOREPLIFETIME(AFGTarget, Origin);
+    DOREPLIFETIME(AFGTarget, Facing);
+    DOREPLIFETIME(AFGTarget, bExplosive);
+}
+
+void AFGTarget::BeginPlay()
+{
+    Super::BeginPlay();
+    Presentation = AFGPresentation::Get(this);
+    if (Presentation.IsValid()) { AddTickPrerequisiteActor(Presentation.Get()); }
+    if (HasAuthority() && Origin.IsZero())
+    {
+        Origin = GetActorLocation();
+        Facing = GetActorRotation();
+    }
+}
+
+double AFGTarget::Now() const
+{
+    const AFGGameState* GS = GetWorld()->GetGameState<AFGGameState>();
+    return GS ? GS->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+}
+
+void AFGTarget::SetMesh(UStaticMesh* Asset, float InScale)
+{
+    MeshAsset = Asset;
+    Scale = InScale;
+    OnRep_Look();
+}
+
+void AFGTarget::OnRep_Look()
+{
+    Mesh->SetStaticMesh(MeshAsset);
+    SetActorScale3D(FVector(Scale));
+}
+
+void AFGTarget::PlaceAt(const FVector& Location, const FRotator& Rotation)
+{
+    Origin = Location;
+    Facing = Rotation;
+    SetActorLocationAndRotation(Location, Rotation);
+}
+
+void AFGTarget::Throw(const FVector& InVelocity, float InGravity)
+{
+    Origin = GetActorLocation();
+    Velocity = InVelocity;
+    Gravity = InGravity;
+    ThrownAt = Now();
+}
+
 void AFGTarget::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    if (Anchor)
+    if (Anchor.IsSet() && Presentation.IsValid())
     {
-        const FTransform T = FTransform(Local) * Anchor();
+        const FTransform T = FTransform(Local) * Presentation->AnchorTransform(Anchor);
         SetActorLocationAndRotation(T.GetLocation(), T.GetRotation());
     }
-    if (Follow.IsValid())
+    else if (Gravity != 0.0f || !Velocity.IsZero())
     {
-        SetActorLocation(Follow->GetComponentLocation());
+        // The same arc on every screen, from when it left the hand.
+        const float Age = float(FMath::Max(0.0, Now() - ThrownAt));
+        SetActorLocationAndRotation(Origin + Velocity * Age - FVector(0.0f, 0.0f, 0.5f * Gravity * Age * Age), FRotator(540.0f * Age, 0.0f, 0.0f));
     }
-    if (Gravity != 0.0f || !Velocity.IsZero())
+    else if (!HasAuthority())
     {
-        Velocity.Z -= Gravity * DeltaTime;
-        SetActorLocation(GetActorLocation() + Velocity * DeltaTime);
-        AddActorLocalRotation(FRotator(540.0f * DeltaTime, 0.0f, 0.0f));
+        SetActorLocationAndRotation(Origin, Facing);
     }
-    if (Fuse > 0.0f)
+    if (HasAuthority() && Fuse > 0.0f)
     {
         Fuse -= DeltaTime;
         if (Fuse <= 0.0f && bActive)
@@ -42,19 +113,14 @@ void AFGTarget::Tick(float DeltaTime)
     }
 }
 
-void AFGTarget::Shot()
+void AFGTarget::Shot(AFGTrainPlayer* By)
 {
     if (!bActive) { return; }
     if (bBreaks)
     {
         bActive = false;
-        for (int32 i = 0; i < 7; ++i)
-        {
-            const FVector V(FMath::FRandRange(-250.0f, 250.0f), FMath::FRandRange(-250.0f, 250.0f), FMath::FRandRange(100.0f, 420.0f));
-            AFGFx::Spawn(GetWorld(), TEXT("fx"), TEXT("SM_Shard_Glass"), FTransform(FRotator(FMath::FRandRange(0.f, 360.f), FMath::FRandRange(0.f, 360.f), 0.f), Centre(), FVector(2.0f)),
-                1.2f, V, 0.0f, 980.0f, FRotator(500.0f, 300.0f, 0.0f));
-        }
+        if (AFGGameState* GS = GetWorld()->GetGameState<AFGGameState>()) { GS->MulticastFx(EFGFxKind::Shards, Centre(), 0.0f); }
     }
-    if (OnShot) { OnShot(this); }
+    if (OnShot) { OnShot(this, By); }
     if (bBreaks) { Destroy(); }
 }

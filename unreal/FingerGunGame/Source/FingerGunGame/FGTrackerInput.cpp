@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Modules/ModuleManager.h"
 #include "SocketSubsystem.h"
 #include "Sockets.h"
@@ -50,6 +52,28 @@ UFGTrackerInput::UFGTrackerInput()
 void UFGTrackerInput::BeginPlay()
 {
     Super::BeginPlay();
+    // -FGTrackerPort=7010 moves all three ports (7010, 7011, 7012): two copies of the game on one machine.
+    // -FGNoTracker: mouse and keys only, no ports at all.
+    if (FParse::Value(FCommandLine::Get(), TEXT("FGTrackerPort="), StatePort))
+    {
+        CommandPort = StatePort + 1;
+        CameraPort = StatePort + 2;
+    }
+    bNoTracker = FParse::Param(FCommandLine::Get(), TEXT("FGNoTracker"));
+}
+
+bool UFGTrackerInput::IsLocal() const
+{
+    const APawn* Pawn = Cast<APawn>(GetOwner());
+    return Pawn && Pawn->IsLocallyControlled();
+}
+
+void UFGTrackerInput::OpenSockets()
+{
+    // Only the player at this machine listens. In co-op the host also holds a copy of the partner's player, and on a
+    // Mac a second socket on 7000 would quietly take half of the host's own tracker packets.
+    bOpened = true;
+    if (bNoTracker) { return; }
     StateSocket = MakeListener(TEXT("FGState"), StatePort);
     CameraSocket = MakeListener(TEXT("FGCamera"), CameraPort);
     SendSocket = FUdpSocketBuilder(TEXT("FGCommands")).AsNonBlocking().Build();
@@ -71,6 +95,8 @@ bool UFGTrackerInput::HasCameraPreview() const
 void UFGTrackerInput::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    if (!IsLocal()) { return; }
+    if (!bOpened) { OpenSockets(); }
 
     PollState();
     PollCamera();

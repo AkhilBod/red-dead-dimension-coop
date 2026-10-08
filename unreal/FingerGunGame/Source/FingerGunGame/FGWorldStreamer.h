@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "FGNetTypes.h"
 #include "FGWorldStreamer.generated.h"
 
 class UStaticMeshComponent;
@@ -38,6 +39,7 @@ struct FFGChunkDef
 struct FFGPlacedChunk
 {
     const FFGChunkDef* Def = nullptr;
+    int32 Index = 0;                        // since the line was laid
     double StartS = 0.0;                    // metres along the whole line
     FTransform Start;                       // chain space
     TObjectPtr<UStaticMeshComponent> Mesh;
@@ -58,7 +60,20 @@ class FINGERGUNGAME_API AFGWorldStreamer : public AActor
 public:
     AFGWorldStreamer();
 
-    virtual void BeginPlay() override;
+    virtual void PostInitializeComponents() override;
+
+    /**
+     * Co-op: on a client the line is not picked here but copied from the host, chunk by chunk (ApplyChunk), so both
+     * screens show the same tunnels and bridges at the same distance.
+     */
+    bool bReplica = false;
+    TFunction<void(const FFGChunkRec&)> OnChunkAppended;
+    TFunction<void(int32 Id, double AtS, float Side)> OnLeanAdded;
+    void ApplyChunk(const FFGChunkRec& Rec);
+    void AddLeanObstacleAt(int32 Id, double AtS, float Side);
+    int32 NextChunkIndex() const { return NextIndex; }
+    /** Same chunks.json in the same order on both machines, or chunk numbers mean different things. */
+    int32 DefsChecksum() const;
 
     /** Chunks to lay next, by name without the FG_Chunk_ prefix ("Landmark_WaterTower_A"). Random once empty. */
     void Queue(const TArray<FString>& Names);
@@ -83,6 +98,10 @@ public:
     void AddLeanObstacle(double Ahead, float Side);
     /** Nearest one still ahead: metres to it, and which side its arm is on. -1 if none. */
     float MetresToLeanObstacle(float& OutSide) const;
+    /** Did a signal arm sit between these two distances along the line? Each player is judged where they stand. */
+    bool LeanObstacleBetween(double FromS, double ToS, float& OutSide) const;
+    /** Did an event of Kind start between these two distances? */
+    bool EventBetween(FName Kind, double FromS, double ToS) const;
     void ClearQueue() { Pending.Reset(); }
     /** Tear the whole line up and start again from nothing (ride again). */
     void ResetLine();
@@ -91,6 +110,12 @@ public:
 
     /** Only straight chunks for now (the showdown: the sun has to stay put behind the boss). */
     bool bStraightOnly = false;
+
+    /**
+     * How much track to keep behind. The train reaches 35 m back from the player, so a chunk is normally dropped as
+     * soon as its far end is 70 m behind. In a 1v1 one of the two faces backwards and sees as far as the other.
+     */
+    double KeepBehindM = 70.0;
 
     /** How far the world has been turned round the train, degrees. Anything that belongs to the landscape, like the sun, turns with it. */
     float WorldYaw() const;
@@ -115,11 +140,15 @@ private:
     const FFGChunkDef* FindDef(const FString& ShortName) const;
     const FFGChunkDef* PickNext();
     void Append(const FFGChunkDef* Def);
-    void BuildTown(FFGPlacedChunk& Placed);
+    void Lay(const FFGChunkDef* Def, int32 Index, const FTransform& Start, int32 TownSeed);
+    void BuildTown(FFGPlacedChunk& Placed, int32 Seed);
 
-    struct FLeanObstacle { double S; float Side; TArray<TObjectPtr<USceneComponent>> Parts; };
+    struct FLeanObstacle { int32 Id; double S; float Side; TArray<TObjectPtr<USceneComponent>> Parts; };
     TArray<FLeanObstacle> LeanObstacles;
-    bool bNextIsTown = false;
+    void BuildLeanObstacle(FLeanObstacle& Ob);
+    int32 NextTownSeed = 0;
+    int32 NextIndex = 0;
+    int32 NextLeanId = 0;
 
     UPROPERTY()
     TArray<TObjectPtr<USceneComponent>> LiveDressing;

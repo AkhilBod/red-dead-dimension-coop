@@ -6,7 +6,7 @@
 
 class UFont;
 
-/** Canvas HUD: crosshair, cylinder, hats, pictogram prompts, the tracker's camera preview, the result poster. */
+/** Canvas HUD: crosshair, cylinder, hats, pictogram prompts, the tracker's camera preview, the result poster, and the partner. */
 UCLASS()
 class FINGERGUNGAME_API AFGHud : public AHUD
 {
@@ -26,4 +26,8 @@ private:
     void Text(const FString& Str, float X, float Y, int32 Size, FLinearColor Color, bool bCentre = true, bool bShadow = true);
     void Ring(FVector2D C, float Radius, float Thickness, FLinearColor Color, int32 Segments = 28);
     void Hat(float X, float Y, float S, FLinearColor Color);
+    void DrawPartner(const class AFGTrainPlayer* Partner, float W, float H);
+    void DrawCoop(const class AFGGameState* GS, float W, float H, float Now);
+    void DrawMenu(const class AFGPlayerController* PC, const class UFGTrackerInput* Tracker, float W, float H, float Now);
+    void DrawPoster(const class AFGGameState* GS, const class AFGTrainPlayer* Player, const class AFGPlayerState* Me, const class AFGTrainPlayer* Partner, float Now);
 };
