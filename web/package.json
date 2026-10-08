@@ -1,0 +1,23 @@
+{
+  "name": "red-dead-dimension-web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "assets": "node tools/build_assets.mjs",
+    "test": "node test/match.mjs"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^0.21.0"
+  }
+}

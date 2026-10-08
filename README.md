@@ -2,6 +2,8 @@
 
 A Wild West train shooter where your hand is the gun. Built in 24 hours at SteelHacks 2026, now for two players on two computers: [co-op or a 1v1 duel](#two-players).
 
+**Play the 1v1 duel in your browser: https://red-dead-dimension.azurewebsites.net** — phone, tablet or computer, nothing to install. One player creates a room and sends the code or link; the other joins. Mouse, touch, or a webcam finger gun. (Source in [`web/`](web/).)
+
 ![Eight moments from a run](docs/screenshots/montage.jpg)
 
 You're on the roof of a moving steam train and bandits keep coming. Make a finger gun at your webcam and point. That's your crosshair. There's no controller.
@@ -139,6 +141,7 @@ Every model in the game is built by Python scripts in `art/blender/` (characters
 ```
 tracker/   Python computer vision + gesture logic
 unreal/    UE5 game
+web/       the browser version (1v1 duel): Node + WebSockets server, three.js client
 arduino/   glove firmware
 art/       Blender build scripts and exported models
 docs/      architecture notes, slides, screenshots
