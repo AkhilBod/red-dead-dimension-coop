@@ -1,6 +1,6 @@
 # Red Dead Dimension
 
-A Wild West train shooter where your hand is the gun. Built in 24 hours at SteelHacks 2026.
+A Wild West train shooter where your hand is the gun. Built in 24 hours at SteelHacks 2026, now for two players on two computers: [co-op or a 1v1 duel](#two-players).
 
 ![Eight moments from a run](docs/screenshots/montage.jpg)
 
@@ -46,6 +46,47 @@ The game side is C++ in `unreal/FingerGunGame/Source`. The world streams under a
 | ![Canyon](docs/screenshots/03_canyon_riders.jpg) Riders in the canyon | ![Second train](docs/screenshots/04_second_train.jpg) The bandit train pulls alongside |
 | ![Tunnel](docs/screenshots/05_tunnel_stay_down.jpg) Stay down through the tunnel | ![Draw](docs/screenshots/06_showdown_draw.jpg) Holster, wait, DRAW |
 | ![Night falls](docs/screenshots/07_night_falls.jpg) Beat the boss and night falls, with a new gun | ![Night](docs/screenshots/08_night_ride.jpg) Lap two, in the dark |
+
+## Two players
+
+The game opens on a menu. Aim at an item with your finger gun (or the mouse) and shoot it, or press 1-4:
+
+| | |
+| --- | --- |
+| **Ride** | On your own: the run above. |
+| **Host a co-op ride** | You and a partner on two computers, on the same roof, against the same bandits. |
+| **Host a 1v1 duel** | You against your partner, quick-draw. |
+| **Join a partner** | Your partner hosts a ride or a duel; type the address their screen shows. |
+
+Each player sits at their own computer with their own webcam. Mouse and keys work too.
+
+### Co-op ride
+
+- Each of you has three hats. Lose them all and you're down: you can't shoot, and the bandits leave you alone.
+- Any headshot gives a hat to whoever needs it most. If your partner is down, that brings them back. Beat the boss and everyone is back up.
+- A bandit shoots at whichever of you can see it coming and has the fewest guns on them. Its warning ring is red when it's aimed at you, amber when it's aimed at your partner.
+- Duck bars, signal arms and tunnels catch each of you where you stand. Your partner kneels on the roof in front of you and ducks and aims when they do.
+- At the boss duel, both of you holster. If either of you fires before DRAW, the wait starts over. The boss draws on both of you.
+- The ride is over when you're both down. Both shoot the poster to ride again.
+
+### 1v1 duel
+
+- You stand at opposite ends of the passenger car roof, ten metres apart, facing each other, while the train rolls on.
+- Each round: both holster (gun hand to your hip, or hold H). WAIT FOR IT... then DRAW!
+- The first to hit the other wins the round, and the loser's hat flies off. Lean out of the way and their shot can miss.
+- Fire before DRAW and you lose the round.
+- Three hats each: lose them all and you've lost the duel. The poster shows the score and each player's fastest draw.
+- Draw speed is timed on each player's own screen from the moment DRAW! appears there, so a slower connection doesn't decide who was faster.
+
+### Connecting
+
+1. Both computers run the game (the same build).
+2. The host picks **Host a co-op ride** or **Host a 1v1 duel** (or starts with `./play.sh --coop-host` / `./play.sh --duel-host`). The screen shows their address and waits.
+3. The other player picks **Join a partner**, types that address and presses Enter (or `./play.sh --coop-join 192.168.1.20`).
+
+On the same Wi-Fi that's all. Over the internet, the host forwards UDP port 7777 on their router to their computer and gives out their public IP, or you both join the same [Tailscale](https://tailscale.com) network and use the host's Tailscale address. The first time, macOS asks the host whether to accept incoming connections: allow it.
+
+Trying it on one Mac: `unreal/FingerGunGame/Scripts/coop_test.sh` (or `--versus`) starts a host and a guest side by side, both playing themselves. How it works is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#10-co-op).
 
 ## The glove
 

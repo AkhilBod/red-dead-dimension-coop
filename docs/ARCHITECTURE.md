@@ -260,3 +260,49 @@ flowchart TD
 ```
 
 Tuning loop: play, the session is recorded as landmarks, replay it offline through this exact pipeline, change a threshold, compare numbers. 55 automated tests guard the behaviour.
+
+## 10. Co-op
+
+Two riders on one roof, each with their own webcam on their own computer. One computer hosts (an Unreal listen server on UDP 7777), the other joins it by address. The host runs the game; the other machine shows it.
+
+```mermaid
+flowchart LR
+    subgraph hostpc [Host computer]
+        t1[Tracker] -->|UDP 7000| p1[Host's player]
+        gm[AFGIronHorseGameMode<br/>runs everything] --> gs[AFGGameState]
+        gm --> bandits[AFGBandit / AFGTarget]
+        pres1[AFGPresentation<br/>line, trains, sky]
+    end
+    subgraph guestpc [Guest computer]
+        t2[Tracker] -->|UDP 7000| p2[Guest's player]
+        pres2[AFGPresentation<br/>copies the host's line]
+    end
+    p2 -->|ServerInput 30 Hz<br/>ServerFire| gm
+    gs -->|phase, prompts, score,<br/>train clock, chunk log| pres2
+    bandits -->|spec, motion, anim,<br/>warning, target| guestpc
+    gs -->|shots, sounds, effects<br/>multicast| guestpc
+```
+
+- **The host decides, everyone draws.** `AFGIronHorseGameMode` exists only on the host. At the end of every frame it copies what the screens need into `AFGGameState` (`PublishState`). Timers go over as server times, never as countdowns.
+- **The world is not replicated.** Each machine has its own `AFGPresentation`, which owns the chunk streamer, both trains, sky, fog and sound. The host writes every chunk it lays into a 32-slot ring on the game state (`FFGChunkRec`: which chunk, where it starts, the town's random seed). A client lays the same chunks from that ring, and carries the train forward between updates from `{distance, speed, server time}`. About 30 bytes per 50 m of track, and a late joiner gets the line from where it is.
+- **Bandits ride on anchors, not attachments.** A bandit on a boxcar is stored in that car's frame (`FFGAnchor`), and each machine works out where the car is itself. Their AI runs on the host. Clients get what each bandit is, where it is in its frame and how fast that is changing, its animation, when its barrel flashes and who it is aiming at.
+- **Your hands stay yours.** Each player's tracker drives only their own player (`UFGTrackerInput` opens its ports only for the local player, or a host would take its partner's packets). Aim, lean, duck and holster go to the host about 30 times a second; the partner sees a cowboy on the roof that ducks and aims with them.
+- **Shots.** The shooter sees and hears their shot at once, aimed where their own screen thinks it lands. `ServerFire` sends the ray; the host decides what it hit with the same aim assist as solo (`FGCombat::FindHit`) and shows the shot to everyone else.
+- **Dodging across a network.** A bullet aimed at a player over the network is judged a round trip later than one aimed at the host, so a dodge made in time on that player's own screen counts. The duel's draw time is measured on the shooter's own screen from when DRAW! reached it.
+
+The co-op rules, on top of solo:
+
+| | |
+| --- | --- |
+| Hats | Each rider has three. Out of hats, you're down: no shooting, and bandits ignore you. |
+| Revive | A headshot gives a hat to whoever needs it most. A partner who is down comes back with it. Beating the boss brings everyone back. |
+| Bandits | Each shot picks a rider who can see it coming and has the fewest guns on them. The warning ring is red when it's you, amber when it's your partner. Two riders get a few more bandits. |
+| Hazards | Duck bars, signal arms and tunnels are judged on each rider where they stand. |
+| Duel | Both holster. Either one firing early resets the wait. The boss draws on both. |
+| End | When both are down. The poster has a column each. Both shoot to ride again. |
+
+**1v1 duel** (`?versus` on the host's URL): the same machinery with the two players seated at either end of the passenger car roof facing each other (`SeatYaw`), the line kept straight and 450 m long behind the train as well as ahead, and `AFGIronHorseGameMode::TickVersus` running rounds of holster, wait, DRAW!. A shot is judged on the host against the other player's cowboy (its chest and head bones, which the host keeps posed even when nobody is looking at them). The first hit to arrive waits a round trip for a quicker one from the other side: the faster draw wins, timed on each shooter's own screen.
+
+The main menu (`AFGPlayerController::IsMenuOpen`) is solo only, drawn by the HUD and picked by shooting it like anything else. Hosting reopens the level with `?listen` (or `?listen?versus`); leaving reopens it plain.
+
+Testing on one Mac: `unreal/FingerGunGame/Scripts/coop_test.sh` starts a host and a guest side by side, both playing themselves, and the `IronHorse: chunk N` lines in `Saved/host.log` and `Saved/guest.log` must match.
