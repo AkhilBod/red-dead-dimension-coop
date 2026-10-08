@@ -12,6 +12,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Tests only: the same duel with short pauses, so a whole match takes seconds.
 if (process.env.RDD_FAST) { Object.assign(RULES, { introMs: 300, holsterMaxMs: 300, waitMinMs: 300, waitMaxMs: 400, pointMs: 300, pauseMs: 3000, drawMaxMs: 3000, graceMs: 1500 }); }
 const PORT = Number(process.env.PORT) || 8080;
+// A socket that answers nothing for a whole beat is gone (a phone asleep, Wi-Fi lost, an app killed): close it, so
+// the room sees the drop instead of waiting forever on a player who will never send another word.
+const HEARTBEAT_MS = process.env.RDD_FAST ? 1000 : 5000;
 const rooms = new Rooms();
 
 const app = express();
@@ -24,6 +27,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
 
 wss.on('connection', (ws) => {
+  ws.alive = true;
+  ws.on('pong', () => { ws.alive = true; });
   let seat = null;                      // { room, player } once in a room
   let budget = 60;                      // messages per second: a broken or hostile page cannot flood the room
   const refill = setInterval(() => { budget = 60; }, 1000);
@@ -31,6 +36,7 @@ wss.on('connection', (ws) => {
   const fail = (message, error = 'error') => send({ t: 'error', error, message });
 
   ws.on('message', (data) => {
+    ws.alive = true;
     if (--budget < 0) { return; }
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
@@ -70,5 +76,13 @@ setInterval(() => {
   rooms.tick();
   for (const room of rooms.rooms.values()) { room.flush(); }
 }, 50);
+
+setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.alive) { ws.terminate(); continue; }
+    ws.alive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
 
 server.listen(PORT, () => console.log(`Red Dead Dimension on http://localhost:${PORT}`));

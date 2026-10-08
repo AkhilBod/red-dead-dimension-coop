@@ -179,6 +179,17 @@ assert.equal(left.result.reason, 'left');
 assert.equal(left.hostId, d.id, 'the host role passes on');
 ok('a new opponent can take the free seat; leaving mid-duel hands it over; the host role passes on');
 
+// a connection that dies without closing (a phone asleep, Wi-Fi gone): the server notices on its own
+const e = new Client('E');
+await e.open();
+e.send({ t: 'join', code: a.code, name: 'Eve' });
+await e.next((m) => m.t === 'joined');
+await d.until((s) => s.players.length === 2 && s.players.every((p) => p.connected));
+e.ws._socket.pause();                                   // stops reading: no pongs, no messages, no close
+await d.until((s) => s.players.some((p) => p.id === e.id && !p.connected), 8000 * SLOW);
+ok('a connection that goes silent without closing shows as dropped within seconds');
+
+e.ws.terminate();
 for (const cl of [a, c, d]) { cl.ws.close(); }
 server?.kill();
 console.log('\nAll duel checks passed.');
