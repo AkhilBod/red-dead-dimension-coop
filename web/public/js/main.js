@@ -31,7 +31,7 @@ const sound = new Sound();
 const gun = new FingerGun();
 const controls = new Controls(canvas, $('touchpad'), shoot);
 controls.onRecenter = () => gun.recenter();
-gun.onFire = (aim) => shoot(aim, 'webcam');
+gun.onFire = (aim, at) => shoot(aim, 'webcam', at);
 
 const me = () => state?.players.find((p) => p.id === you);
 const them = () => state?.players.find((p) => p.id !== you);
@@ -95,7 +95,7 @@ $('use-webcam').addEventListener('click', async () => {
   try {
     await gun.start($('webcam'), $('webcam-dots'));
     setGunChoice(true);
-    $('webcam-note').textContent = 'Point a finger gun at the screen; drop your thumb to fire. Lower your hand to holster. Space re-centres.';
+    $('webcam-note').textContent = 'Point a finger gun at the screen and hold it still a moment: that spot is the middle. Drop your thumb to fire. Lower your hand to holster. Space re-centres.';
   } catch (err) {
     setGunChoice(false);
     $('webcam-note').textContent = `No webcam finger gun here (${err?.name === 'NotAllowedError' ? 'camera permission was refused' : 'the camera or the hand tracker did not start'}). Mouse and touch still work.`;
@@ -245,7 +245,7 @@ function onState(s) {
   if (first) { history.replaceState(null, '', `/?room=${s.code}`); }
 }
 
-function shoot(aim, kind) {
+function shoot(aim, kind, at = performance.now()) {
   sound.unlock();
   if (!state || state.phase !== 'match') { return; }
   const m = me(), t = them();
@@ -253,7 +253,8 @@ function shoot(aim, kind) {
   if (state.step !== 'wait' && state.step !== 'draw') { return; }      // holstered: nothing to fire yet
   if (m.ammo <= 0) { sound.play('dry'); return; }
   const ray = world.rayAt(aim.x, aim.y);
-  const react = state.step === 'draw' && drawShownAt ? Math.round(performance.now() - drawShownAt) : null;
+  // A webcam shot counts from when the thumb started to drop, not from when the tracker was sure of it.
+  const react = state.step === 'draw' && drawShownAt ? Math.max(0, Math.round(at - drawShownAt)) : null;
   net.send({ t: 'shot', o: ray.o, d: ray.d, react });
   // Seen and heard at once; the server decides what it hit.
   const tp = world.smooth[t.seat];
@@ -308,7 +309,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   controls.tick(dt);
-  const aim = gun.on && gun.gunPose ? gun.aim : controls.aim;
+  const aim = gun.on && gun.tracking ? gun.aim : controls.aim;
   const input = {
     lean: Math.round(controls.lean * 100) / 100,
     duck: Math.round(controls.duck * 100) / 100,
